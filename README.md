@@ -269,3 +269,8 @@ Struktura repozytorium i backend Django zostały zainicjalizowane. Frontend Next
 ## Licencja
 
 Warunki wykorzystania projektu nie zostały jeszcze określone.
+
+
+## Zrobione
+
+### T07. Utworzenie projektu Django
