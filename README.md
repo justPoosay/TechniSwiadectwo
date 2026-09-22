@@ -50,7 +50,31 @@ docs/       dokumentacja techniczna i decyzje architektoniczne
 infra/      konfiguracja środowiska i infrastruktury
 ```
 
-Szczegółowe instrukcje uruchomienia backendu i frontendu zostaną dodane wraz z inicjalizacją poszczególnych aplikacji.
+## Uruchomienie backendu
+
+Backend wymaga Pythona oraz działającej bazy PostgreSQL. W systemie Windows można przygotować środowisko poleceniami:
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements\dev.txt
+Copy-Item .env.example .env
+```
+
+Zmienne z `.env` należy ustawić zgodnie z lokalną konfiguracją PostgreSQL i udostępnić procesowi Django. Następnie można wykonać migracje i uruchomić serwer:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py runserver
+```
+
+Endpoint kontrolny jest dostępny pod adresem `http://127.0.0.1:8000/api/health/` i zwraca odpowiedź `{"status":"ok"}`.
+
+Testy backendu uruchamia polecenie:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
 
 ## Główne zasady bezpieczeństwa
 
@@ -63,7 +87,7 @@ Szczegółowe instrukcje uruchomienia backendu i frontendu zostaną dodane wraz 
 
 ## Status
 
-Projekt znajduje się na etapie przygotowania struktury repozytorium. Backend i frontend nie zostały jeszcze zainicjalizowane.
+Struktura repozytorium i backend Django zostały zainicjalizowane. Frontend Next.js nie został jeszcze utworzony.
 
 ## Licencja
 

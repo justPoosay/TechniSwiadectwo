@@ -1,0 +1,4 @@
+-r base.txt
+
+pytest>=9.0,<10.0
+pytest-django>=4.11,<5.0
