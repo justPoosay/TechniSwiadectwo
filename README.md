@@ -273,4 +273,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T07. Utworzenie projektu Django
+### T08. Uruchomić frontend Next.js
