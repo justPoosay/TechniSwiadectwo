@@ -273,4 +273,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T08. Uruchomić frontend Next.js
+### T09. Przygotować środowisko kontenerowe
