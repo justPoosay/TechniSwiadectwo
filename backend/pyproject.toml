@@ -27,7 +27,7 @@ indent-style = "space"
 
 [tool.mypy]
 python_version = "3.13"
-plugins = ["mypy_django_plugin.main"]
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
@@ -36,6 +36,10 @@ exclude = [
     "\\.venv",
     "migrations",
 ]
+
+[[tool.mypy.overrides]]
+module = "rest_framework.*"
+ignore_missing_imports = true
 
 [tool.django-stubs]
 django_settings_module = "config.settings.development"
