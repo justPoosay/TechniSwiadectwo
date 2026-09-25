@@ -297,9 +297,23 @@ npm run check-all
 | **Backend** | `ruff format backend` | `ruff check backend` | `mypy backend` | `pytest backend` |
 | **Frontend** | `npm run format --prefix frontend` | `npm run lint --prefix frontend` | `npm run type-check --prefix frontend` | `npm run test --prefix frontend` |
 
+### CI / CD (GitHub Actions)
+
+W repozytorium skonfigurowano potok CI (`.github/workflows/ci.yml`), który uruchamia się automatycznie przy zdarzeniach `push` oraz `pull_request` dla głównych gałęzi (`main`, `master`, `develop`). Potok składa się z dwóch równoległych zadań:
+
+- **Backend**:
+  - Uruchamia dedykowany kontener bazy danych PostgreSQL 16.
+  - Instaluje zależności Python 3.13.
+  - Weryfikuje formatowanie (`Ruff`), lintowanie (`Ruff`), typy (`Mypy`) oraz testy (`Pytest`).
+  - Wykonuje migracje na pustej bazie PostgreSQL (`manage.py migrate`) oraz sprawdzanie nieutworzonych migracji (`manage.py makemigrations --check --dry-run`).
+- **Frontend**:
+  - Instaluje zależności Node.js 20 (`npm ci`).
+  - Weryfikuje formatowanie (`Prettier`), lintowanie (`ESLint`), typy (`TypeScript`) oraz testy (`Vitest`).
+  - Wykonuje produkcyjną kompilację aplikacji Next.js (`npm run build`).
+
 ## Status
 
-Struktura repozytorium, backend Django, frontend Next.js oraz narzędzia kontroli jakości kodu (T10) zostały skonfigurowane i zweryfikowane.
+Struktura repozytorium, backend Django, frontend Next.js, narzędzia kontroli jakości kodu (T10) oraz potok CI GitHub Actions (T11) zostały skonfigurowane i zweryfikowane.
 
 ## Licencja
 
@@ -308,4 +322,7 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
+### T09. Przygotować środowisko kontenerowe
 ### T10. Skonfigurować jakość kodu
+### T11. Skonfigurować CI
+
