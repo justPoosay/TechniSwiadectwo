@@ -22,307 +22,259 @@ Projekt wykorzystuje wyłącznie dane fikcyjne. Wersja POC obsłuży jeden wybra
 ## Technologie
 
 ### Backend
-
-- Python;
-- Django;
-- Django REST Framework;
-- PostgreSQL.
+- Python 3.13;
+- Django 5.2;
+- Django REST Framework 3.16;
+- PostgreSQL 16.
 
 ### Frontend
-
-- Next.js;
-- TypeScript;
-- App Router.
+- Next.js 16 (App Router);
+- React 19;
+- TypeScript 5;
+- Tailwind CSS 4.
 
 ### Jakość i infrastruktura
-
-- Docker;
-- testy jednostkowe, integracyjne i end-to-end;
-- automatyczna kontrola formatowania, typów i jakości kodu;
-- CI uruchamiane dla zmian w repozytorium.
+- Docker & Docker Compose;
+- Ruff (linter i formatowanie dla Pythona);
+- Mypy & django-stubs (kontrola typów w Pythonie);
+- Pytest & pytest-django (testy backendu);
+- Prettier & ESLint (formatowanie i lintowanie TypeScript);
+- Vitest & React Testing Library (testy frontendu);
+- GitHub Actions CI Pipeline (`.github/workflows/ci.yml`).
 
 ## Struktura repozytorium
 
 ```text
-backend/    aplikacja Django i REST API
-frontend/   aplikacja Next.js
-docs/       dokumentacja techniczna i decyzje architektoniczne
-infra/      konfiguracja środowiska i infrastruktury
+backend/    Aplikacja Django i REST API
+frontend/   Aplikacja Next.js
+infra/      Konfiguracja kontenerowa Docker Compose
+docs/       Dokumentacja techniczna i decyzje architektoniczne
+scripts/    Skrypty deweloperskie (np. check-quality.ps1)
 ```
 
-## Pierwsze uruchomienie po sklonowaniu repozytorium
+---
 
-Poniższa instrukcja opisuje konfigurację backendu w systemie Windows przy użyciu PowerShella. Środowisko wirtualne, hasła i lokalna baza danych nie są przechowywane w Git, dlatego każdy członek zespołu tworzy je na swoim komputerze.
+## Przewodnik po lokalnym uruchomieniu (od A do Z)
+
+Poniższa instrukcja prowadzi krok po kroku od pierwszego sklonowania repozytorium do w pełni działającej aplikacji oraz przechodzących testów na lokalnym komputerze.
 
 ### 1. Wymagane oprogramowanie
 
-Przed rozpoczęciem należy zainstalować:
+Przed rozpoczęciem upewnij się, że masz zainstalowane:
 
-- Git;
-- Python 3.13;
-- PostgreSQL;
-- opcjonalnie pgAdmin do graficznego zarządzania PostgreSQL.
+- **Git** (`git --version`)
+- **Python 3.13** lub 3.12 (`python --version`)
+- **Node.js 20+** oraz `npm` (`node --version`, `npm --version`)
+- **Docker Desktop** / Docker Compose (zalecane do uruchomienia całości jednym poleceniem)
+- *Opcjonalnie*: PostgreSQL 16 zainstalowany lokalnie (jeśli uruchamiasz backend bez Dockera).
 
-Poprawność instalacji można sprawdzić poleceniami:
+---
 
-```powershell
-git --version
-python --version
-psql --version
-```
+### 2. Sklonowanie repozytorium i przygotowanie zmiennych środowiskowych
 
-Jeżeli `psql` nie jest rozpoznawany, można użyć narzędzia SQL w pgAdmin albo dodać katalog `bin` PostgreSQL do zmiennej `PATH`.
+#### 2.1 Sklonowanie repozytorium:
 
-### 2. Sklonowanie repozytorium
-
-```powershell
+```bash
 git clone <adres-repozytorium>
 cd TechniSwiadectwo
 ```
 
-W miejsce `<adres-repozytorium>` należy wstawić adres HTTPS lub SSH projektu.
+#### 2.2 Przygotowanie plików środowiskowych `.env`:
 
-### 3. Utworzenie środowiska wirtualnego
+W repozytorium dostarczone są wzorcowe pliki konfiguracyjne `.env.example` oraz `.example.env`. Pliki `.env` zawierają lokalne sekrety i nie są dodawane do systemu Git.
 
-Każdy programista tworzy własny katalog `backend/.venv`. Nie należy kopiować go od innej osoby ani dodawać do repozytorium.
-
+W systemie Windows (PowerShell):
 ```powershell
-cd backend
-python -m venv .venv
+Copy-Item backend\.env.example backend\.env
+Copy-Item frontend\.example.env frontend\.env
 ```
 
-Nie trzeba aktywować środowiska, jeśli polecenia są wykonywane bezpośrednio przez znajdujący się w nim interpreter:
-
-```powershell
-.\.venv\Scripts\python.exe --version
-```
-
-Alternatywnie można aktywować środowisko poleceniem:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Jeśli PowerShell blokuje aktywację skryptu, można nadal używać pełnej ścieżki `.\.venv\Scripts\python.exe` pokazanej w dalszej części instrukcji.
-
-### 4. Instalacja zależności Pythona
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements\dev.txt
-```
-
-Plik `requirements/base.txt` zawiera zależności aplikacji, a `requirements/dev.txt` dodatkowo narzędzia potrzebne podczas programowania i testowania.
-
-### 5. Utworzenie użytkownika i bazy PostgreSQL
-
-Należy połączyć się z PostgreSQL jako administrator, na przykład:
-
-```powershell
-psql -U postgres
-```
-
-Następnie w konsoli PostgreSQL wykonać poniższe polecenia. Hasło `lokalne-haslo` należy zastąpić własnym hasłem używanym tylko w lokalnym środowisku:
-
-```sql
-CREATE USER techniswiadectwo WITH PASSWORD 'lokalne-haslo';
-CREATE DATABASE techniswiadectwo OWNER techniswiadectwo;
-```
-
-Konsolę PostgreSQL można zamknąć poleceniem:
-
-```text
-\q
-```
-
-Te same operacje można wykonać w pgAdmin, tworząc użytkownika `techniswiadectwo` oraz bazę `techniswiadectwo`, której właścicielem będzie ten użytkownik.
-
-### 6. Konfiguracja zmiennych środowiskowych
-
-Plik `backend/.env.example` jest wzorem wymaganej konfiguracji. Można utworzyć lokalną kopię:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Plik `.env` jest ignorowany przez Git i nie wolno umieszczać w nim haseł używanych przez inne osoby lub środowiska. Na obecnym etapie Django nie wczytuje tego pliku automatycznie. Przed uruchomieniem aplikacji trzeba ustawić zmienne w bieżącej sesji PowerShella:
-
-```powershell
-$env:POSTGRES_DB="techniswiadectwo"
-$env:POSTGRES_USER="techniswiadectwo"
-$env:POSTGRES_PASSWORD="lokalne-haslo"
-$env:POSTGRES_HOST="localhost"
-$env:POSTGRES_PORT="5432"
-```
-
-Zmienne ustawione w ten sposób obowiązują do zamknięcia bieżącego okna PowerShella. Po otwarciu nowego okna należy ustawić je ponownie.
-
-W trybie lokalnym `manage.py` automatycznie używa ustawień `config.settings.development`. Nie trzeba ustawiać `DJANGO_SECRET_KEY`, ponieważ konfiguracja developerska ma osobny, nieprodukcyjny klucz.
-
-### 7. Sprawdzenie konfiguracji i migracje
-
-```powershell
-.\.venv\Scripts\python.exe manage.py check
-.\.venv\Scripts\python.exe manage.py migrate
-```
-
-Polecenie `migrate` powinno połączyć się z lokalną bazą PostgreSQL i utworzyć wymagane tabele Django.
-
-### 8. Uruchomienie serwera
-
-```powershell
-.\.venv\Scripts\python.exe manage.py runserver
-```
-
-Serwer działa domyślnie pod adresem `http://127.0.0.1:8000/`. Endpoint kontrolny:
-
-```text
-http://127.0.0.1:8000/api/health/
-```
-
-Powinien zwrócić kod HTTP 200 i odpowiedź:
-
-```json
-{"status": "ok"}
-```
-
-Serwer można zatrzymać skrótem `Ctrl+C`.
-
-### 9. Uruchomienie testów
-
-Testy korzystają z osobnej konfiguracji i bazy SQLite w pamięci, dlatego nie modyfikują lokalnej bazy PostgreSQL:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest
-```
-
-Kontrolę brakujących migracji można wykonać poleceniem:
-
-```powershell
-.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=config.settings.test
-```
-
-### 10. Codzienna praca po pierwszej konfiguracji
-
-Po ponownym uruchomieniu komputera lub otwarciu nowej sesji PowerShella nie trzeba tworzyć `.venv` ani instalować wszystkich paczek od początku. Należy:
-
-1. przejść do katalogu `backend`;
-2. ustawić zmienne `POSTGRES_*` w bieżącej sesji;
-3. pobrać nowe zmiany z repozytorium;
-4. ponownie wykonać instalację z `requirements/dev.txt`, jeśli zmieniły się zależności;
-5. uruchomić migracje, jeśli pojawiły się nowe pliki migracji;
-6. uruchomić testy i serwer.
-
-Przykładowy zestaw poleceń:
-
-```powershell
-git pull
-$env:POSTGRES_DB="techniswiadectwo"
-$env:POSTGRES_USER="techniswiadectwo"
-$env:POSTGRES_PASSWORD="lokalne-haslo"
-$env:POSTGRES_HOST="localhost"
-$env:POSTGRES_PORT="5432"
-.\.venv\Scripts\python.exe -m pip install -r requirements\dev.txt
-.\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe manage.py runserver
-```
-
-### Najczęstsze problemy
-
-#### `python` nie jest rozpoznawany
-
-Python nie znajduje się w `PATH`. Należy ponownie uruchomić instalator Pythona i zaznaczyć opcję dodania Pythona do `PATH`.
-
-#### Nie można uruchomić `Activate.ps1`
-
-Aktywacja nie jest wymagana. Należy wykonywać polecenia przez `.\.venv\Scripts\python.exe`.
-
-#### `connection refused` albo błąd połączenia z PostgreSQL
-
-Należy sprawdzić, czy usługa PostgreSQL działa, czy port jest poprawny oraz czy wartości `POSTGRES_DB`, `POSTGRES_USER` i `POSTGRES_PASSWORD` odpowiadają lokalnej bazie.
-
-#### `password authentication failed`
-
-Hasło ustawione w `POSTGRES_PASSWORD` nie zgadza się z hasłem użytkownika PostgreSQL. Należy poprawić zmienną albo hasło lokalnego użytkownika bazy.
-
-#### `No module named django`
-
-Polecenie zostało wykonane poza właściwym środowiskiem lub zależności nie zostały zainstalowane. Należy użyć `.\.venv\Scripts\python.exe` i ponownie wykonać instalację `requirements/dev.txt`.
-
-## Konfiguracja produkcyjna
-
-Instrukcja powyżej dotyczy wyłącznie lokalnego środowiska developerskiego. Ustawienia `config.settings.production` wymagają między innymi silnego `DJANGO_SECRET_KEY`, listy `DJANGO_ALLOWED_HOSTS`, bezpiecznego połączenia HTTPS oraz właściwej konfiguracji PostgreSQL. Nie należy używać developerskich haseł ani kluczy na środowisku wdrożeniowym.
-
-## Główne zasady bezpieczeństwa
-
-- W repozytorium nie wolno umieszczać prawdziwych danych uczniów.
-- Sekrety i lokalne pliki środowiskowe nie mogą być commitowane.
-- Uprawnienia są zawsze egzekwowane przez backend.
-- Dane poszczególnych szkół muszą być od siebie odseparowane.
-- Wystawione dokumenty muszą zachowywać niezmienną wersję danych i użytego wzoru.
-- Istotne operacje muszą pozostawiać wpis w historii audytowej.
-
-## Kontrola jakości kodu i polecenia deweloperskie
-
-W projekcie skonfigurowano następujące narzędzia kontroli jakości kodu:
-
-- **Backend (Python)**:
-  - Formatowanie i lintowanie: `Ruff` (konfiguracja w `backend/pyproject.toml`)
-  - Kontrola typów: `Mypy` z wtyczką Django (`django-stubs`)
-  - Testy jednostkowe: `Pytest` z `pytest-django`
-- **Frontend (TypeScript)**:
-  - Formatowanie: `Prettier` (konfiguracja w `frontend/.prettierrc`)
-  - Lintowanie: `ESLint` z regułami `Next.js` i `eslint-config-prettier`
-  - Kontrola typów: `TypeScript` (`tsc --noEmit`)
-  - Testy jednostkowe: `Vitest` z `@testing-library/react`
-
-### Zbiorcze polecenie sprawdzania jakości
-
-Można uruchomić pełną weryfikację jakości z poziomu katalogu głównego projektu za pomocą dedykowanego skryptu PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\check-quality.ps1
-```
-
-Alternatywnie z poziomu korzenia przy użyciu `npm`:
-
+W systemie Linux / macOS (Bash):
 ```bash
-npm run check-all
+cp backend/.env.example backend/.env
+cp frontend/.example.env frontend/.env
 ```
 
-### Polecenia szczegółowe
+---
 
-| Obszar | Formatowanie | Lintowanie | Kontrola typów | Testy |
-|---|---|---|---|---|
-| **Backend** | `ruff format backend` | `ruff check backend` | `mypy backend` | `pytest backend` |
-| **Frontend** | `npm run format --prefix frontend` | `npm run lint --prefix frontend` | `npm run type-check --prefix frontend` | `npm run test --prefix frontend` |
+### Sposób A: Uruchomienie za pomocą Docker Compose (Najszybsze / Zalecane)
 
-### CI / CD (GitHub Actions)
+Ta metoda uruchamia bazę danych PostgreSQL, backend Django oraz frontend Next.js w odizolowanych kontenerach za pomocą jednego polecenia.
 
-W repozytorium skonfigurowano potok CI (`.github/workflows/ci.yml`), który uruchamia się automatycznie przy zdarzeniach `push` oraz `pull_request` dla głównych gałęzi (`main`, `master`, `develop`). Potok składa się z dwóch równoległych zadań:
+1. **Uruchomienie kontenerów**:
 
-- **Backend**:
-  - Uruchamia dedykowany kontener bazy danych PostgreSQL 16.
-  - Instaluje zależności Python 3.13.
-  - Weryfikuje formatowanie (`Ruff`), lintowanie (`Ruff`), typy (`Mypy`) oraz testy (`Pytest`).
-  - Wykonuje migracje na pustej bazie PostgreSQL (`manage.py migrate`) oraz sprawdzanie nieutworzonych migracji (`manage.py makemigrations --check --dry-run`).
-- **Frontend**:
-  - Instaluje zależności Node.js 20 (`npm ci`).
-  - Weryfikuje formatowanie (`Prettier`), lintowanie (`ESLint`), typy (`TypeScript`) oraz testy (`Vitest`).
-  - Wykonuje produkcyjną kompilację aplikacji Next.js (`npm run build`).
+   Wykonaj z głównego katalogu repozytorium:
+   ```bash
+   docker-compose -f infra/docker-compose.yml up --build
+   ```
 
-## Status
+2. **Dostęp do serwisów**:
+   - **Frontend (Next.js)**: `http://localhost:3000/`
+   - **Backend API Health Check**: `http://localhost:8000/api/health/`
+   - **Panel administracyjny Django**: `http://localhost:8000/admin/`
 
-Struktura repozytorium, backend Django, frontend Next.js, narzędzia kontroli jakości kodu (T10) oraz potok CI GitHub Actions (T11) zostały skonfigurowane i zweryfikowane.
+3. **Zatrzymanie kontenerów**:
+   Naciśnij `Ctrl+C` lub wykonaj w osobnym terminalu:
+   ```bash
+   docker-compose -f infra/docker-compose.yml down
+   ```
+
+---
+
+### Sposób B: Uruchomienie lokalne (Bez kontenerów)
+
+Jeśli wolisz uruchomić backend i frontend bezpośrednio na swoim systemie operacyjnym:
+
+#### Krok 1: Konfiguracja i uruchomienie Backendu (Django)
+
+1. Przejdź do katalogu backendu:
+   ```bash
+   cd backend
+   ```
+
+2. Utwórz środowisko wirtualne Python (katalog `.venv` lub `venv`):
+   - PowerShell:
+     ```powershell
+     python -m venv .venv
+     ```
+   - Bash:
+     ```bash
+     python3 -m venv .venv
+     source .venv/bin/activate
+     ```
+
+3. Zainstaluj zależności deweloperskie:
+   - PowerShell:
+     ```powershell
+     .\.venv\Scripts\python.exe -m pip install -r requirements\dev.txt
+     ```
+   - Bash / Linux:
+     ```bash
+     pip install -r requirements/dev.txt
+     ```
+
+4. Przygotuj bazę danych PostgreSQL:
+   - Połącz się z lokalnym serwerem PostgreSQL i utwórz bazę oraz użytkownika (dane z pliku `.env`):
+     ```sql
+     CREATE USER techniswiadectwo WITH PASSWORD 'lokalne-haslo';
+     CREATE DATABASE techniswiadectwo OWNER techniswiadectwo;
+     ```
+   - Ustaw zmienne środowiskowe połączenia w bieżącej sesji terminala lub upewnij się, że plik `.env` posiada poprawne wartości:
+     - `POSTGRES_DB=techniswiadectwo`
+     - `POSTGRES_USER=techniswiadectwo`
+     - `POSTGRES_PASSWORD=lokalne-haslo`
+     - `POSTGRES_HOST=localhost`
+     - `POSTGRES_PORT=5432`
+
+5. Wykonaj migracje bazy danych:
+   - PowerShell:
+     ```powershell
+     .\.venv\Scripts\python.exe manage.py migrate
+     ```
+   - Bash:
+     ```bash
+     python manage.py migrate
+     ```
+
+6. Uruchom serwer deweloperski backendu:
+   - PowerShell:
+     ```powershell
+     .\.venv\Scripts\python.exe manage.py runserver
+     ```
+   - Bash:
+     ```bash
+     python manage.py runserver
+     ```
+   Serwer wystartuje pod adresem `http://127.0.0.1:8000/`.
+
+---
+
+#### Krok 2: Konfiguracja i uruchomienie Frontendu (Next.js)
+
+1. Otwórz nowe okno terminala i przejdź do katalogu frontendu:
+   ```bash
+   cd frontend
+   ```
+
+2. Zainstaluj zależności npm:
+   ```bash
+   npm install
+   ```
+
+3. Uruchom serwer deweloperski Next.js:
+   ```bash
+   npm run dev
+   ```
+   Aplikacja wystartuje pod adresem `http://localhost:3000/`.
+
+---
+
+## Testy i kontrola jakości kodu
+
+W projekcie skonfigurowano kompletny zestaw narzędzi do weryfikacji jakości kodu.
+
+### 1. Zbiorcze uruchomienie wszystkich sprawdzianów (Wspólne polecenia)
+
+Z katalogu głównego projektu można uruchomić pełen zestaw testów, lintowania, kontroli typów i formatowania:
+
+- **PowerShell (Windows)**:
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\scripts\check-quality.ps1
+  ```
+- **NPM (Cross-platform)**:
+  ```bash
+  npm run check-all
+  ```
+
+### 2. Szczegółowe polecenia dla pojedynczych obszarów
+
+| Obszar | Formatowanie | Lintowanie | Kontrola typów | Testy jednostkowe | Build produkcyjny |
+|---|---|---|---|---|---|
+| **Backend** | `ruff format backend` | `ruff check backend` | `mypy backend` | `pytest backend` | N/A |
+| **Frontend** | `npm run format --prefix frontend` | `npm run lint --prefix frontend` | `npm run type-check --prefix frontend` | `npm run test --prefix frontend` | `npm run build --prefix frontend` |
+
+---
+
+## Continuous Integration (CI / CD)
+
+Każda zmiana wysłana na gałęzie `main`, `master` lub `develop` (oraz w ramach Pull Requestów) automatycznie uruchamia potok CI w **GitHub Actions** (`.github/workflows/ci.yml`), który wykonuje:
+1. Budowanie bazy PostgreSQL 16 i wykonywanie wszystkich migracji od zera (`manage.py migrate`).
+2. Sprawdzanie nieutworzonych migracji (`manage.py makemigrations --check --dry-run`).
+3. Formatowanie i lintowanie kodu (Ruff, ESLint, Prettier).
+4. Kontrolę typów (Mypy, TypeScript `tsc --noEmit`).
+5. Uruchomienie testów jednostkowych (Pytest, Vitest).
+6. Produkcyjny build Next.js (`npm run build`).
+
+---
+
+## Najczęstsze problemy (Troubleshooting)
+
+### 1. Błąd połączenia z PostgreSQL (`connection refused` / `password authentication failed`)
+- Upewnij się, że usługa PostgreSQL działa i nasłuchuje na porcie `5432`.
+- Sprawdź, czy nazwa bazy, użytkownik i hasło w pliku `backend/.env` zgadzają się z ustawieniami PostgreSQL.
+
+### 2. Problem z importami `rest_framework` w Mypy
+- Upewnij się, że zainstalowano najnowsze dev-dependencies:
+  `pip install -r backend/requirements/dev.txt` (pakiet `djangorestframework-stubs`).
+
+### 3. `TS2304: Cannot find name 'LayoutProps'` we Frontendzie
+- Używaj standardowego typowania React dla komponentu layoutu: `{ children }: Readonly<{ children: React.ReactNode }>`.
+
+---
+
+## Status projektu
+
+Struktura repozytorium, backend Django, frontend Next.js, środowisko kontenerowe Docker Compose, narzędzia jakości kodu oraz potok CI GitHub Actions i pełna dokumentacja lokalnego uruchomienia zostały skonfigurowane i zweryfikowane.
+
+---
 
 ## Licencja
 
 Warunki wykorzystania projektu nie zostały jeszcze określone.
 
+---
 
 ## Zrobione
 
-### T09. Przygotować środowisko kontenerowe
-### T10. Skonfigurować jakość kodu
-### T11. Skonfigurować CI
 
+### T12. Udokumentować lokalne uruchomienie
