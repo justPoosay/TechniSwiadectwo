@@ -1,0 +1,23 @@
+{
+  "name": "techniswiadectwo-root",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint:backend": "ruff check backend",
+    "lint:frontend": "npm run lint --prefix frontend",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "format:backend": "ruff format backend",
+    "format:frontend": "npm run format --prefix frontend",
+    "format": "npm run format:backend && npm run format:frontend",
+    "format:check:backend": "ruff format --check backend",
+    "format:check:frontend": "npm run format:check --prefix frontend",
+    "format:check": "npm run format:check:backend && npm run format:check:frontend",
+    "type-check:backend": "mypy backend",
+    "type-check:frontend": "npm run type-check --prefix frontend",
+    "type-check": "npm run type-check:backend && npm run type-check:frontend",
+    "test:backend": "pytest backend",
+    "test:frontend": "npm run test --prefix frontend",
+    "test": "npm run test:backend && npm run test:frontend",
+    "check-all": "npm run lint && npm run format:check && npm run type-check && npm run test"
+  }
+}

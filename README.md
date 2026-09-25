@@ -262,9 +262,44 @@ Instrukcja powyżej dotyczy wyłącznie lokalnego środowiska developerskiego. U
 - Wystawione dokumenty muszą zachowywać niezmienną wersję danych i użytego wzoru.
 - Istotne operacje muszą pozostawiać wpis w historii audytowej.
 
+## Kontrola jakości kodu i polecenia deweloperskie
+
+W projekcie skonfigurowano następujące narzędzia kontroli jakości kodu:
+
+- **Backend (Python)**:
+  - Formatowanie i lintowanie: `Ruff` (konfiguracja w `backend/pyproject.toml`)
+  - Kontrola typów: `Mypy` z wtyczką Django (`django-stubs`)
+  - Testy jednostkowe: `Pytest` z `pytest-django`
+- **Frontend (TypeScript)**:
+  - Formatowanie: `Prettier` (konfiguracja w `frontend/.prettierrc`)
+  - Lintowanie: `ESLint` z regułami `Next.js` i `eslint-config-prettier`
+  - Kontrola typów: `TypeScript` (`tsc --noEmit`)
+  - Testy jednostkowe: `Vitest` z `@testing-library/react`
+
+### Zbiorcze polecenie sprawdzania jakości
+
+Można uruchomić pełną weryfikację jakości z poziomu katalogu głównego projektu za pomocą dedykowanego skryptu PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check-quality.ps1
+```
+
+Alternatywnie z poziomu korzenia przy użyciu `npm`:
+
+```bash
+npm run check-all
+```
+
+### Polecenia szczegółowe
+
+| Obszar | Formatowanie | Lintowanie | Kontrola typów | Testy |
+|---|---|---|---|---|
+| **Backend** | `ruff format backend` | `ruff check backend` | `mypy backend` | `pytest backend` |
+| **Frontend** | `npm run format --prefix frontend` | `npm run lint --prefix frontend` | `npm run type-check --prefix frontend` | `npm run test --prefix frontend` |
+
 ## Status
 
-Struktura repozytorium i backend Django zostały zainicjalizowane. Frontend Next.js nie został jeszcze utworzony.
+Struktura repozytorium, backend Django, frontend Next.js oraz narzędzia kontroli jakości kodu (T10) zostały skonfigurowane i zweryfikowane.
 
 ## Licencja
 
@@ -273,4 +308,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T09. Przygotować środowisko kontenerowe
+### T10. Skonfigurować jakość kodu
