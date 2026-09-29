@@ -30,6 +30,9 @@ services:
       - "8000:8000"
     env_file:
       - ../backend/.env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.development
+      - PYTHONPATH=/app
     depends_on:
       db:
         condition: service_healthy
