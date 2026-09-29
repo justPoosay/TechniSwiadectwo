@@ -1,9 +1,12 @@
 from django.contrib import admin
-from .models import School, AcademicYear, Cohort
+
+from .models import AcademicYear, Cohort, School
+
 
 @admin.register(School)
 class SchoolAdmin(admin.ModelAdmin):
     list_display = ("name", "city", "rspo")
+
 
 @admin.register(AcademicYear)
 class AcademicYearAdmin(admin.ModelAdmin):
