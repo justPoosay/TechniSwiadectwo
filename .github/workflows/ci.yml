@@ -10,6 +10,9 @@ jobs:
   backend:
     name: Backend (Python & Django)
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      DJANGO_SETTINGS_MODULE: config.settings.development
 
     services:
       postgres:
@@ -43,16 +46,20 @@ jobs:
           pip install -r backend/requirements/dev.txt
 
       - name: Check formatting (Ruff)
-        run: ruff format --check backend
+        working-directory: backend
+        run: ruff format --check .
 
       - name: Lint code (Ruff)
-        run: ruff check backend
+        working-directory: backend
+        run: ruff check .
 
       - name: Type check (Mypy)
-        run: mypy backend
+        working-directory: backend
+        run: mypy .
 
       - name: Run unit tests (Pytest)
-        run: pytest backend
+        working-directory: backend
+        run: pytest
 
       - name: Test migrations on clean PostgreSQL database
         env:
@@ -61,9 +68,10 @@ jobs:
           POSTGRES_PASSWORD: postgres_ci_password
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
+        working-directory: backend
         run: |
-          python backend/manage.py migrate --settings=config.settings.development
-          python backend/manage.py makemigrations --check --dry-run --settings=config.settings.development
+          python manage.py migrate
+          python manage.py makemigrations --check --dry-run
 
   frontend:
     name: Frontend (Next.js & TypeScript)
