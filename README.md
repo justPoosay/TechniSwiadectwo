@@ -276,4 +276,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T12. Udokumentować lokalne uruchomienie
+### T13. Utworzyć aplikację szkół
