@@ -17,5 +17,5 @@ class IsSchoolMember(permissions.BasePermission):
         active_school = getattr(request, "school", None)
 
         if school_id and active_school:
-            return school_id == active_school.id
+            return bool(school_id == active_school.id)
         return False
