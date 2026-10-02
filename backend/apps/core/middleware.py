@@ -1,7 +1,9 @@
 from collections.abc import Callable
+from typing import cast
 
 from django.http import HttpRequest, HttpResponse
 
+from apps.core.types import AuthenticatedSchoolRequest
 from apps.users.models import SchoolMembership
 
 
@@ -10,6 +12,7 @@ class ActiveSchoolMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
+        request = cast(AuthenticatedSchoolRequest, request)
         request.school = None
         request.school_membership = None
 
