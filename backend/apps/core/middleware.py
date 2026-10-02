@@ -12,26 +12,24 @@ class ActiveSchoolMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        request = cast(AuthenticatedSchoolRequest, request)
-        request.school = None
-        request.school_membership = None
+        req = cast(AuthenticatedSchoolRequest, request)
+        req.school = None
+        req.school_membership = None
 
-        if request.user.is_authenticated:
-            school_id = request.headers.get("X-School-ID") or request.GET.get(
-                "school_id"
-            )
+        if req.user.is_authenticated:
+            school_id = req.headers.get("X-School-ID") or req.GET.get("school_id")
 
             if school_id:
                 membership = (
                     SchoolMembership.objects.filter(
-                        user=request.user, school_id=school_id, is_active=True
+                        user=req.user, school_id=school_id, is_active=True
                     )
                     .select_related("school")
                     .first()
                 )
 
                 if membership:
-                    request.school = membership.school
-                    request.school_membership = membership
+                    req.school = membership.school
+                    req.school_membership = membership
 
-        return self.get_response(request)
+        return self.get_response(req)
