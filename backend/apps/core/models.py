@@ -69,11 +69,11 @@ class Cohort(models.Model):  # Since "class" is restricted :(
 
 
 class SchoolScopedQuerySet(models.QuerySet):
-    #Filtrowanie obiektów pod wzgl szkoly
+    # Filtrowanie obiektów pod wzgl szkoly
     def for_schools(self, school):
         if not school:
             return self.none()
-        return self.filter(school = school)
+        return self.filter(school=school)
 
     def for_user(self, user):
         if not user or not user.is_authenticated:
@@ -85,18 +85,15 @@ class SchoolScopedQuerySet(models.QuerySet):
         ).distinct()
 
 
-class ScoopedSchoolModel(models.Model):
+class ScopedSchoolModel(models.Model):
     school = models.ForeignKey(
         "core.school",
         on_delete=models.CASCADE,
         related_name="%(app_label)s_$(class)s_set",
-        verbose_name="Szkoła"
+        verbose_name="Szkoła",
     )
 
     objects = SchoolScopedQuerySet.as_manager()
 
     class Meta:
         abstract = True
-    
-
-
