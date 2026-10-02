@@ -46,3 +46,9 @@ django_settings_module = "config.settings.development"
 
 [tool.mypy_django_plugin]
 django_settings_module = "config.settings.development"
+
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.development"
+python_files = ["test_*.py", "*_test.py"]
+addopts = "--reuse-db"
