@@ -66,3 +66,37 @@ class Cohort(models.Model):  # Since "class" is restricted :(
 
     def __str__(self):
         return f"Klasa {self.name} {self.academic_year.name}"
+
+
+class SchoolScopedQuerySet(models.QuerySet):
+    #Filtrowanie obiektów pod wzgl szkoly
+    def for_schools(self, school):
+        if not school:
+            return self.none()
+        return self.filter(school = school)
+
+    def for_user(self, user):
+        if not user or not user.is_authenticated:
+            return self.none()
+        if user.is_superuser:
+            return self.all()
+        return self.filter(
+            school__memberships__user=user, school__membership__is__active=True
+        ).distinct()
+
+
+class ScoopedSchoolModel(models.Model):
+    school = models.ForeignKey(
+        "core.school",
+        on_delete=models.CASCADE,
+        related_name="%(app_label)s_$(class)s_set",
+        verbose_name="Szkoła"
+    )
+
+    objects = SchoolScopedQuerySet.as_manager()
+
+    class Meta:
+        abstract = True
+    
+
+
