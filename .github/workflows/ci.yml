@@ -13,6 +13,11 @@ jobs:
     env:
       PYTHONPATH: backend
       DJANGO_SETTINGS_MODULE: config.settings.development
+      POSTGRES_DB: techniswiadectwo
+      POSTGRES_USER: techniswiadectwo
+      POSTGRES_PASSWORD: postgres_ci_password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
 
     services:
       postgres:
@@ -62,12 +67,6 @@ jobs:
         run: pytest
 
       - name: Test migrations on clean PostgreSQL database
-        env:
-          POSTGRES_DB: techniswiadectwo
-          POSTGRES_USER: techniswiadectwo
-          POSTGRES_PASSWORD: postgres_ci_password
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
         working-directory: backend
         run: |
           python manage.py migrate
