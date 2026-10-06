@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
 
+from apps.core.models import AuditLog
 from apps.users.models import SchoolMembership, User
 
 
@@ -66,3 +67,28 @@ class SchoolMembershipAdmin(admin.ModelAdmin):
         "school__name",
     )
     raw_id_fields = ("user", "school")
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "school",
+        "actor",
+        "action",
+        "target_type",
+        "target_id",
+        "ip_address",
+    )
+    list_filter = ("action", "target_type", "school", "created_at")
+    search_fields = ("actor__email", "target_id", "changes")
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return False
