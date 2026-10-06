@@ -8,9 +8,14 @@ from apps.core.types import AuthenticatedSchoolRequest
 
 def get_client_ip(request: AuthenticatedSchoolRequest) -> str | None:
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
+    if isinstance(x_forwarded_for, str) and x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+
+    remote_addr = request.META.get("REMOTE_ADDR")
+    if isinstance(remote_addr, str):
+        return remote_addr
+
+    return None
 
 
 def log_audit_event(
@@ -19,13 +24,14 @@ def log_audit_event(
     target: models.Model,
     changes: dict[str, Any] | None = None,
 ) -> AuditLog | None:
-    if not getattr(request, "school", None):
+    school = getattr(request, "school", None)
+    if school is None:
         return None
 
     actor = request.user if request.user.is_authenticated else None
 
     return AuditLog.objects.create(
-        school=request.school,
+        school=school,
         actor=actor,
         action=action,
         target_type=target.__class__.__name__,
