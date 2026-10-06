@@ -2,15 +2,12 @@ from typing import Any, cast
 
 from django.db import models
 
-from apps.core.types import AuthenticatedSchoolRequest
-
 
 class SchoolScopedViewSetMixin:
-    request: AuthenticatedSchoolRequest
-
     def get_queryset(self) -> models.QuerySet[Any]:
         queryset = super().get_queryset()  # type: ignore[misc]
-        school = getattr(self.request, "school", None)
+        request = getattr(self, "request", None)
+        school = getattr(request, "school", None) if request else None
 
         if school is not None:
             filtered_qs = queryset.filter(school=school)
