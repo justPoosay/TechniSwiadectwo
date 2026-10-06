@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 
@@ -97,3 +98,63 @@ class ScopedSchoolModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class AuditLog(models.Model):
+    class Action(models.TextChoices):
+        CREATE = "create", "Tworzenie"
+        UPDATE = "update", "Edycja"
+        DELETE = "delete", "Usuwanie"
+        LOGIN = "login", "Logowanie"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey(
+        "core.School",
+        on_delete=models.CASCADE,
+        related_name="audit_logs",
+        verbose_name="Szkoła",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_actions",
+        verbose_name="Aktor",
+    )
+    action = models.CharField(
+        max_length=20,
+        choices=Action.choices,
+        verbose_name="Operacja",
+    )
+    target_type = models.CharField(
+        max_length=100,
+        verbose_name="Typ obiektu",
+    )
+    target_id = models.CharField(
+        max_length=255,
+        verbose_name="Identyfikator obiektu",
+    )
+    changes = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Bezpieczny opis zmian",
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name="Adres IP",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        verbose_name="Czas zdarzenia",
+    )
+
+    class Meta:
+        verbose_name = "Wpis audytowy"
+        verbose_name_plural = "Wpisy audytowe"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.actor} -> {self.action} {self.target_type} ({self.target_id})"
