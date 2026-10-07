@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.users",
     "apps.core",
+    "apps.students",
 ]
 
 AUTH_USER_MODEL = "users.User"

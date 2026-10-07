@@ -66,7 +66,6 @@ class SchoolMembershipAdmin(admin.ModelAdmin):
         "user__last_name",
         "school__name",
     )
-    raw_id_fields = ("user", "school")
 
 
 @admin.register(AuditLog)

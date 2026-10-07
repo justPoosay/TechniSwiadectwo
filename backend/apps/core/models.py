@@ -55,6 +55,14 @@ class Cohort(models.Model):  # Since "class" is restricted :(
     )
     name = models.CharField(max_length=10, verbose_name="Nazwa Klasy")  # np. 4A
     level = models.IntegerField(verbose_name="Poziom")  # np. 4
+    class_teacher = models.ForeignKey(
+        "students.Teacher",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supervised_cohorts",
+        verbose_name="Wychowawca klasy",
+    )
 
     class Meta:
         verbose_name = "Klasa"
@@ -66,7 +74,7 @@ class Cohort(models.Model):  # Since "class" is restricted :(
         ]
 
     def __str__(self):
-        return f"Klasa {self.name} {self.academic_year.name}"
+        return f"Klasa {self.name} ({self.academic_year.name})"
 
 
 class SchoolScopedQuerySet(models.QuerySet):
