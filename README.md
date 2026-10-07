@@ -276,4 +276,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T17. Dodać modele ucznia i opiekunów
+### T18. Dodać historię przebiegu nauki
