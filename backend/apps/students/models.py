@@ -235,3 +235,45 @@ class StudentHistoryEntry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.student} - {self.get_event_type_display()} ({self.event_date})"
+
+
+class StudentDataCorrection(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name="data_corrections",
+        verbose_name="Uczeń",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Autor korekty",
+    )
+    reason = models.TextField(
+        "Powód korekty",
+        help_text="Wyjaśnienie przyczyny zmiany istotnych danych (np. sprostowanie błędu pisarskiego, zmiana nazwiska po orzeczeniu)",
+    )
+    changed_fields = models.JSONField(
+        "Zmienione pola",
+        default=dict,
+        help_text="Słownik reprezentujący różnice w postaci: {'field_name': {'old': ..., 'new': ...}}",
+    )
+    created_at = models.DateTimeField("Czas korekty", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Korekta danych ucznia"
+        verbose_name_plural = "Korekty danych uczniów"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        if self.author and hasattr(self.author, "get_full_name"):
+            author_name = self.author.get_full_name() or self.author.get_username()
+        elif self.author:
+            author_name = str(self.author)
+        else:
+            author_name = "System / Nieznany"
+
+        return f"Korekta {self.student} przez {author_name} ({self.created_at:%Y-%m-%d %H:%M})"

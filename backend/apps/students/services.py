@@ -1,9 +1,11 @@
 from datetime import date
+from typing import Any
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.core.models import AcademicYear, Cohort
-from apps.students.models import Student, StudentHistoryEntry
+from apps.students.models import Student, StudentDataCorrection, StudentHistoryEntry
 
 
 class StudentEnrollmentService:
@@ -169,3 +171,71 @@ class StudentEnrollmentService:
             document_number=document_number,
             notes=notes,
         )
+
+
+class StudentCorrectionService:
+    TRACKED_FIELDS: set[str] = {
+        "first_name",
+        "second_name",
+        "last_name",
+        "date_of_birth",
+        "place_of_birth",
+        "pesel",
+        "id_document_type",
+        "id_document_number",
+        "register_number",
+    }
+
+    @classmethod
+    @transaction.atomic
+    def update_student_with_history(
+        cls,
+        student: Student,
+        updated_data: dict[str, Any],
+        author: Any,
+        reason: str,
+    ) -> tuple[Student, StudentDataCorrection | None]:
+        if not reason or not reason.strip():
+            raise ValidationError(
+                {"reason": "Wymagane jest podanie powodu korekty istotnych danych."}
+            )
+        db_student = (
+            Student.objects.filter(pk=student.pk).first() if student.pk else None
+        )
+
+        changes: dict[str, dict[str, Any]] = {}
+
+        for field, new_value in updated_data.items():
+            if hasattr(student, field):
+                if field in cls.TRACKED_FIELDS and db_student is not None:
+                    old_value = getattr(db_student, field)
+
+                    old_val_ser = (
+                        old_value.isoformat()
+                        if isinstance(old_value, date)
+                        else old_value
+                    )
+                    new_val_ser = (
+                        new_value.isoformat()
+                        if isinstance(new_value, date)
+                        else new_value
+                    )
+
+                    if old_val_ser != new_val_ser:
+                        changes[field] = {"old": old_val_ser, "new": new_val_ser}
+
+                setattr(student, field, new_value)
+
+        student.full_clean()
+        student.save()
+
+        correction_entry: StudentDataCorrection | None = None
+        if changes:
+            correction_entry = StudentDataCorrection.objects.create(
+                student=student,
+                author=author if getattr(author, "is_authenticated", False) else None,
+                reason=reason.strip(),
+                changed_fields=changes,
+            )
+
+        return student, correction_entry

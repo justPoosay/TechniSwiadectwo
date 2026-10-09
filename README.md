@@ -276,4 +276,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T18. Dodać historię przebiegu nauki
+### T19. Zachowywać wersje zmienianych danych
