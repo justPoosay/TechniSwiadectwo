@@ -276,4 +276,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T19. Zachowywać wersje zmienianych danych
+### T21. Zaimplementować logowanie i wylogowanie
