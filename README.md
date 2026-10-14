@@ -277,3 +277,36 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 ## Zrobione
 
 ### T21. Zaimplementować logowanie i wylogowanie
+
+### T22. Skonfigurować komunikację Next.js–Django
+
+Przeglądarka rozmawia wyłącznie z Next.js (ten sam origin). Każde żądanie `/api/*` jest przekazywane do Django przez route handler `frontend/src/app/api/[...path]/route.ts` (logika w `frontend/src/lib/api/proxy.ts`):
+
+```text
+przeglądarka ──/api/auth/me/──▶ Next.js :3000 ──BACKEND_URL/api/auth/me/──▶ Django :8000
+```
+
+- Adres Django ustawia zmienna **`BACKEND_URL`** (tylko po stronie serwera, nie trafia do przeglądarki): `http://localhost:8000` lokalnie, `http://backend:8000` w Docker Compose.
+- Proxy przekazuje tylko potrzebne nagłówki (cookie, `X-CSRFToken`, `Origin`, `Referer`…), każde `Set-Cookie` osobno, usuwa `WWW-Authenticate` i nie ujawnia wewnętrznego adresu backendu w przekierowaniach. Gdy Django nie odpowiada, zwraca JSON `{"detail", "code"}` ze statusem 502 (`backend_unavailable`) albo 504 (`backend_timeout`).
+- `skipTrailingSlashRedirect` w `next.config.ts` zachowuje końcowy `/` wymagany przez URL-e Django.
+- Sesja: cookie `sessionid` jest `HttpOnly` + `SameSite=Lax`. Żadne tokeny ani dane osobowe nie są zapisywane w `localStorage`.
+- CSRF: `GET /api/auth/csrf/` ustawia cookie `csrftoken`, a klient odsyła je w nagłówku `X-CSRFToken` przy każdym żądaniu zmieniającym dane (także przy logowaniu).
+- Niezalogowany użytkownik dostaje **401**, zalogowany bez uprawnień **403**. Domyślnie każdy endpoint wymaga zalogowania (`IsAuthenticated`).
+
+Klient API dla komponentów (`frontend/src/lib/api`):
+
+```ts
+import { api, ApiError } from "@/lib/api";
+
+try {
+  const user = await api.post<User>("/auth/login/", { email, password });
+} catch (error) {
+  if (error instanceof ApiError) {
+    error.message;      // komunikat do wyświetlenia
+    error.fieldErrors;  // { email: ["..."] } dla formularzy
+    error.isUnauthenticated; // 401 → przekierowanie do logowania
+  }
+}
+```
+
+Zmienne Django: `DJANGO_ALLOWED_HOSTS` musi zawierać `backend` (host używany przez proxy w Dockerze), a `DJANGO_CSRF_TRUSTED_ORIGINS` adres frontendu (`http://localhost:3000`).
