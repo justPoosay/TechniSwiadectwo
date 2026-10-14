@@ -63,6 +63,8 @@ jobs:
         run: mypy .
 
       - name: Run unit tests (Pytest)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
         working-directory: backend
         run: pytest
 

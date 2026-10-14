@@ -15,6 +15,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Constraint must go first: SQLite rebuilds the table on RemoveField and
+        # fails when the constraint still references the removed column.
+        migrations.RemoveConstraint(
+            model_name='studentguardian',
+            name='unique_student_guardian_relationship',
+        ),
         migrations.RemoveField(
             model_name='studentguardian',
             name='guardian',
