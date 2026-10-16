@@ -26,6 +26,8 @@ services:
              python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ../backend:/app
+      # OpenAPI contract (docs/api/openapi.yaml) checked by the backend tests.
+      - ../docs:/docs:ro
     ports:
       - "8000:8000"
     env_file:
