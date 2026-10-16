@@ -352,3 +352,43 @@ npm run api:generate
 ```
 
 i zacommituj `docs/api/openapi.yaml` oraz `frontend/src/lib/api/schema.ts`. CI pilnuje, żeby nie były nieaktualne: pytest porównuje schemat z kodem (`test_committed_schema_is_up_to_date`), a job frontendu uruchamia `npm run api:types:check`.
+
+### T24. Zbudować logowanie w Next.js
+
+Wdrożono kompletny mechanizm logowania i zarządzania sesją użytkownika:
+
+- **Formularz logowania (`/login`)**:
+  - Walidacja formularza po stronie klienta (e-mail, hasło) oraz prezentacja błędów pól (`field_errors`) i błędów ogólnych zwracanych przez API Django (`ErrorResponse`).
+  - Przełącznik widoczności hasła oraz stan wysyłania (spinner, blokada ponownego kliknięcia).
+- **Zarządzanie sesją (`AuthProvider`, `useAuth`)**:
+  - Automatyczne przywracanie sesji na starcie aplikacji (`GET /api/auth/me/`).
+  - Aktywna szkoła (`currentSchoolId`) oraz rola użytkownika (`currentMembership`).
+  - Funkcja wylogowania (`POST /api/auth/logout/`) czyszcząca stan sesji i przekierowująca do formularza logowania.
+- **Przekierowania**:
+  - Komponent `ProtectedRoute` automatycznie przekierowuje niezalogowanych użytkowników do `/login?next=<ścieżka>`.
+  - Po poprawnym zalogowaniu użytkownik wraca do żądanej strony (lub na pulpit `/`).
+  - Użytkownik zalogowany odwiedzający `/login` jest przekierowywany na pulpit.
+
+### T25. Zbudować szkielet chronionej aplikacji
+
+Wdrożono szkielet interfejsu chronionego (`AppLayout`) dostosowany do roli użytkownika:
+
+- **Menu zależne od roli (`AppSidebar`)**:
+  - **Nauczyciel (`teacher`)**: widok przedmiotów lekcyjnych (`/subjects`) oraz ocen cząstkowych (`/grades`).
+  - **Wychowawca (`homeroom_teacher`)**: widok powierzonej klasy (`/my-class`), arkuszy ocen klasy (`/grade-sheets`) oraz świadectw (`/certificates`).
+  - **Sekretariat (`secretariat`)**: księga uczniów (`/students`) oraz wydawanie świadectw (`/certificates`).
+  - **Dyrekcja (`principal`)**: zatwierdzenia dokumentów (`/approvals`), księga uczniów, świadectwa i dziennik audytu (`/audit`).
+  - **Administrator (`admin`)**: zarządzanie użytkownikami, dziennik audytu i ustawienia szkoły.
+- **Pasek górny (`AppHeader`)**:
+  - Nazwa i logo systemu.
+  - Wybór aktywnej szkoły (`SchoolSelector`) dla użytkowników o wielu przypisaniach.
+  - Dane użytkownika wraz z etykietą i kolorystyczną odznaką roli.
+  - Przycisk wylogowania z obsługą stanu ładowania.
+- **Ścieżka powrotu (`Breadcrumbs`)**:
+  - Dynamiczne generowanie okruszków nawigacyjnych na podstawie aktualnej trasy URL.
+- **Komponenty stanów aplikacji (`frontend/src/components/ui/states/`)**:
+  - Stan ładowania (`LoadingState`, `loading.tsx`) z animowanym wskaźnikiem i etykietą dostępności.
+  - Stan błędu (`ErrorState`, `error.tsx`) z kodem błędu i przyciskiem ponowienia akcji.
+  - Stan braku danych (`EmptyState`) z opisem i opcjonalnym przyciskiem akcji.
+  - Stan braku uprawnień (`UnauthorizedState`) informujący o odmowie dostępu (403 Forbidden) ze wskazaniem brakującej roli.
+
