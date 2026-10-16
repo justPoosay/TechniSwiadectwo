@@ -2,65 +2,53 @@ import { describe, expect, test } from "vitest";
 import { ApiError, errorFromResponse, normalizeErrorBody } from "../errors";
 
 describe("normalizeErrorBody", () => {
-  test("uses DRF detail and code", () => {
+  test("reads the unified ErrorResponse format", () => {
     const error = normalizeErrorBody(403, {
-      detail: "Brak uprawnień do tej szkoły.",
-      code: "school_forbidden",
+      code: "csrf_failed",
+      detail: "Brak lub nieprawidłowy token CSRF.",
     });
 
     expect(error).toBeInstanceOf(ApiError);
-    expect(error.message).toBe("Brak uprawnień do tej szkoły.");
-    expect(error.code).toBe("school_forbidden");
+    expect(error.code).toBe("csrf_failed");
+    expect(error.message).toBe("Brak lub nieprawidłowy token CSRF.");
+    expect(error.fieldErrors).toEqual({});
     expect(error.isForbidden).toBe(true);
   });
 
-  test("uses non_field_errors as the main message", () => {
+  test("keeps field errors, including nested keys", () => {
     const error = normalizeErrorBody(400, {
-      non_field_errors: ["Nieprawidłowy adres e-mail lub hasło."],
+      code: "validation_error",
+      detail: "Popraw zaznaczone pola formularza.",
+      field_errors: { email: ["Wprowadź poprawny adres e-mail."], "guardians.0.phone": ["Zły"] },
     });
 
-    expect(error.message).toBe("Nieprawidłowy adres e-mail lub hasło.");
-    expect(error.fieldErrors).toEqual({});
-  });
-
-  test("collects per-field validation errors", () => {
-    const error = normalizeErrorBody(400, {
-      email: ["Wpisz poprawny adres e-mail."],
-      password: ["To pole jest wymagane."],
-    });
-
-    expect(error.code).toBe("invalid");
-    expect(error.message).toBe("Popraw zaznaczone pola formularza.");
     expect(error.fieldErrors).toEqual({
-      email: ["Wpisz poprawny adres e-mail."],
-      password: ["To pole jest wymagane."],
+      email: ["Wprowadź poprawny adres e-mail."],
+      "guardians.0.phone": ["Zły"],
     });
   });
 
-  test("flattens nested serializer errors", () => {
-    const error = normalizeErrorBody(400, { guardians: [{ phone: ["Błędny numer."] }] });
-
-    expect(error.fieldErrors).toEqual({ guardians: ["Błędny numer."] });
-  });
-
-  test("falls back to a status-based message for empty or non-JSON bodies", () => {
+  test("falls back to a status-based message for unknown bodies", () => {
     expect(normalizeErrorBody(401, null)).toMatchObject({
       code: "not_authenticated",
       isUnauthenticated: true,
     });
     expect(normalizeErrorBody(500, "<html>")).toMatchObject({ code: "server_error" });
-    expect(normalizeErrorBody(502, null).message).toMatch(/błąd serwera/);
+    expect(normalizeErrorBody(400, { email: ["raw DRF"] }).code).toBe("validation_error");
   });
 });
 
 describe("errorFromResponse", () => {
   test("parses JSON bodies", async () => {
-    const response = Response.json({ detail: "Nie znaleziono." }, { status: 404 });
+    const response = Response.json(
+      { code: "not_found", detail: "Nie znaleziono zasobu." },
+      { status: 404 }
+    );
 
     const error = await errorFromResponse(response);
 
     expect(error.status).toBe(404);
-    expect(error.message).toBe("Nie znaleziono.");
+    expect(error.message).toBe("Nie znaleziono zasobu.");
   });
 
   test("ignores non-JSON bodies such as Django debug pages", async () => {

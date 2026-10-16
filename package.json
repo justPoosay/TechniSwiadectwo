@@ -20,6 +20,9 @@
     "test": "npm run test:backend && npm run test:frontend",
     "build:frontend": "npm run build --prefix frontend",
     "build": "npm run build:frontend",
+    "api:schema": "python backend/manage.py spectacular --settings=config.settings.test --file docs/api/openapi.yaml --validate --fail-on-warn",
+    "api:types": "npm run api:types --prefix frontend",
+    "api:generate": "npm run api:schema && npm run api:types",
     "check-all": "npm run lint && npm run format:check && npm run type-check && npm run test && npm run build"
   }
 }

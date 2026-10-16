@@ -1,6 +1,10 @@
+import type { components } from "./schema";
+
+/** Error body returned by Django and by the /api proxy (see docs/api/openapi.yaml). */
+export type ErrorResponse = components["schemas"]["ErrorResponse"];
 export type FieldErrors = Record<string, string[]>;
 
-/** Single error type for every failed API call, whatever shape Django returned. */
+/** Single error type for every failed API call. */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -25,7 +29,7 @@ export class ApiError extends Error {
 
 const DEFAULTS: Record<number, [code: string, message: string]> = {
   0: ["network_error", "Brak połączenia z serwerem. Sprawdź połączenie i spróbuj ponownie."],
-  400: ["invalid", "Przesłane dane są nieprawidłowe."],
+  400: ["validation_error", "Przesłane dane są nieprawidłowe."],
   401: ["not_authenticated", "Sesja wygasła. Zaloguj się ponownie."],
   403: ["permission_denied", "Nie masz uprawnień do wykonania tej operacji."],
   404: ["not_found", "Nie znaleziono zasobu."],
@@ -42,42 +46,23 @@ function defaultsFor(status: number): [string, string] {
   );
 }
 
-function toMessages(value: unknown): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap(toMessages);
-  if (value && typeof value === "object") return Object.values(value).flatMap(toMessages);
-  return [];
+function isErrorResponse(body: unknown): body is ErrorResponse {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    typeof (body as ErrorResponse).code === "string" &&
+    typeof (body as ErrorResponse).detail === "string"
+  );
 }
 
-/** Normalises DRF error bodies: {detail}, {non_field_errors}, {field: [...]}, [...]. */
+/** Any other body (HTML error page, empty response...) falls back to a status-based message. */
 export function normalizeErrorBody(status: number, body: unknown): ApiError {
-  const [defaultCode, defaultMessage] = defaultsFor(status);
-
-  if (Array.isArray(body) || typeof body === "string") {
-    return new ApiError(status, toMessages(body)[0] ?? defaultMessage, defaultCode);
+  if (isErrorResponse(body)) {
+    const [, defaultMessage] = defaultsFor(status);
+    return new ApiError(status, body.detail || defaultMessage, body.code, body.field_errors ?? {});
   }
-  if (!body || typeof body !== "object") {
-    return new ApiError(status, defaultMessage, defaultCode);
-  }
-
-  const { detail, code, non_field_errors: nonField, ...fields } = body as Record<string, unknown>;
-  const errorCode = typeof code === "string" ? code : defaultCode;
-
-  if (typeof detail === "string") {
-    return new ApiError(status, detail, errorCode);
-  }
-
-  const fieldErrors: FieldErrors = {};
-  for (const [field, value] of Object.entries(fields)) {
-    const messages = toMessages(value);
-    if (messages.length) fieldErrors[field] = messages;
-  }
-  const generalMessage = toMessages(nonField)[0];
-  const message =
-    generalMessage ??
-    (Object.keys(fieldErrors).length ? "Popraw zaznaczone pola formularza." : defaultMessage);
-
-  return new ApiError(status, message, errorCode, fieldErrors);
+  const [code, message] = defaultsFor(status);
+  return new ApiError(status, message, code);
 }
 
 export async function errorFromResponse(response: Response): Promise<ApiError> {

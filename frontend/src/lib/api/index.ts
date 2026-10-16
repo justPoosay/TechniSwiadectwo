@@ -1,2 +1,3 @@
-export { api, apiFetch, type ApiRequestOptions } from "./client";
-export { ApiError, type FieldErrors } from "./errors";
+export { api, apiFetch, type ApiPath, type ApiRequestOptions } from "./client";
+export { ApiError, type ErrorResponse, type FieldErrors } from "./errors";
+export type { ApiSchema, RequestBody, ResponseData } from "./types";

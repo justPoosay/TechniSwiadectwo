@@ -287,26 +287,68 @@ przeglądarka ──/api/auth/me/──▶ Next.js :3000 ──BACKEND_URL/api/a
 ```
 
 - Adres Django ustawia zmienna **`BACKEND_URL`** (tylko po stronie serwera, nie trafia do przeglądarki): `http://localhost:8000` lokalnie, `http://backend:8000` w Docker Compose.
-- Proxy przekazuje tylko potrzebne nagłówki (cookie, `X-CSRFToken`, `Origin`, `Referer`…), każde `Set-Cookie` osobno, usuwa `WWW-Authenticate` i nie ujawnia wewnętrznego adresu backendu w przekierowaniach. Gdy Django nie odpowiada, zwraca JSON `{"detail", "code"}` ze statusem 502 (`backend_unavailable`) albo 504 (`backend_timeout`).
+- Proxy przekazuje tylko potrzebne nagłówki (cookie, `X-CSRFToken`, `X-School-ID`, `Origin`, `Referer`…), każde `Set-Cookie` osobno, usuwa `WWW-Authenticate` i nie ujawnia wewnętrznego adresu backendu w przekierowaniach. Gdy Django nie odpowiada, zwraca JSON `{"detail", "code"}` ze statusem 502 (`backend_unavailable`) albo 504 (`backend_timeout`).
 - `skipTrailingSlashRedirect` w `next.config.ts` zachowuje końcowy `/` wymagany przez URL-e Django.
 - Sesja: cookie `sessionid` jest `HttpOnly` + `SameSite=Lax`. Żadne tokeny ani dane osobowe nie są zapisywane w `localStorage`.
 - CSRF: `GET /api/auth/csrf/` ustawia cookie `csrftoken`, a klient odsyła je w nagłówku `X-CSRFToken` przy każdym żądaniu zmieniającym dane (także przy logowaniu).
 - Niezalogowany użytkownik dostaje **401**, zalogowany bez uprawnień **403**. Domyślnie każdy endpoint wymaga zalogowania (`IsAuthenticated`).
 
-Klient API dla komponentów (`frontend/src/lib/api`):
+Klient API dla komponentów jest opisany w T23 (typowany na podstawie OpenAPI).
+
+Zmienne Django: `DJANGO_ALLOWED_HOSTS` musi zawierać `backend` (host używany przez proxy w Dockerze), a `DJANGO_CSRF_TRUSTED_ORIGINS` adres frontendu (`http://localhost:3000`).
+
+### T23. Opublikować kontrakt OpenAPI
+
+Kontrakt API jest generowany z kodu Django przez [drf-spectacular](https://drf-spectacular.readthedocs.io/) i zapisany w repozytorium: **[`docs/api/openapi.yaml`](docs/api/openapi.yaml)**. Na jego podstawie powstają typy TypeScript dla Next.js (`frontend/src/lib/api/schema.ts`, [openapi-typescript](https://openapi-ts.dev/)).
+
+Dokumentacja na żywo (po uruchomieniu aplikacji, także przez proxy na `:3000`):
+
+| Adres | Co to jest |
+| --- | --- |
+| `/api/docs/` | Swagger UI: endpointy, parametry, przykładowe odpowiedzi, „Try it out” |
+| `/api/redoc/` | ReDoc: ta sama dokumentacja w formie do czytania |
+| `/api/schema/` | Schemat OpenAPI 3 (YAML, albo JSON z `Accept: application/json`) |
+
+Opis uwierzytelniania, nagłówka szkoły, paginacji i błędów znajduje się na początku dokumentacji (`backend/config/openapi_description.md`).
+
+**Ujednolicone konwencje API:**
+
+- **Błędy**: każdy błąd ma kształt `{"code", "detail", "field_errors?"}` (`ErrorResponse`), np. `validation_error`, `not_authenticated`, `permission_denied`, `csrf_failed`, `not_found`, `server_error`. Dotyczy też błędów spoza DRF (CSRF, nieznany URL `/api/...`, błąd 500).
+- **Paginacja**: `?page=&page_size=` (domyślnie 25, maks. 100) → `{"count", "page", "page_size", "total_pages", "results"}`. Bez absolutnych linków `next`/`previous`, które za proxy wskazywałyby wewnętrzny adres backendu.
+- **Filtrowanie**: `django-filter` + `?search=` + `?ordering=` (dozwolone wartości są enumem w schemacie).
+- **Szkoła**: endpointy danych szkoły wymagają nagłówka `X-School-ID` (opisany w schemacie jako wymagany).
+
+**Typowany klient** (`frontend/src/lib/api`) sprawdza ścieżki, parametry, body i odpowiedzi względem kontraktu w czasie kompilacji:
 
 ```ts
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type ApiSchema } from "@/lib/api";
+
+const user = await api.get("/api/auth/me/");                // user: ApiSchema["User"]
+await api.post("/api/auth/login/", { body: { email, password } });
+const page = await api.get("/api/audit-logs/", {
+  schoolId,                                                  // wymagane przez X-School-ID
+  query: { action: "login", ordering: "-created_at", page: 2 },
+});
+const log = await api.get("/api/audit-logs/{id}/", { schoolId, path: { id } });
 
 try {
-  const user = await api.post<User>("/auth/login/", { email, password });
+  await api.post("/api/auth/login/", { body: { email, password } });
 } catch (error) {
   if (error instanceof ApiError) {
-    error.message;      // komunikat do wyświetlenia
-    error.fieldErrors;  // { email: ["..."] } dla formularzy
+    error.code;              // np. "validation_error"
+    error.message;           // komunikat do wyświetlenia
+    error.fieldErrors;       // { email: ["..."] } dla formularzy
     error.isUnauthenticated; // 401 → przekierowanie do logowania
   }
 }
 ```
 
-Zmienne Django: `DJANGO_ALLOWED_HOSTS` musi zawierać `backend` (host używany przez proxy w Dockerze), a `DJANGO_CSRF_TRUSTED_ORIGINS` adres frontendu (`http://localhost:3000`).
+Nieistniejąca ścieżka, brak `schoolId`, zła wartość `ordering` albo brak wymaganego pola w `body` to błąd `npm run type-check`.
+
+**Po zmianie API** (nowy endpoint, pole, filtr) wygeneruj kontrakt i typy z głównego katalogu (aktywne venv backendu):
+
+```bash
+npm run api:generate
+```
+
+i zacommituj `docs/api/openapi.yaml` oraz `frontend/src/lib/api/schema.ts`. CI pilnuje, żeby nie były nieaktualne: pytest porównuje schemat z kodem (`test_committed_schema_is_up_to_date`), a job frontendu uruchamia `npm run api:types:check`.

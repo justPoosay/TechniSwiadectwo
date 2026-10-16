@@ -23,6 +23,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "django_filters",
+    "drf_spectacular",
     "apps.users",
     "apps.core",
     "apps.students",
@@ -98,6 +100,27 @@ REST_FRAMEWORK = {
         "apps.users.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "apps.core.filters.SearchFilter",
+        "apps.core.filters.OrderingFilter",
+    ],
+    "EXCEPTION_HANDLER": "apps.core.exceptions.exception_handler",
+    "DEFAULT_SCHEMA_CLASS": "apps.core.schema.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "TechniŚwiadectwo API",
+    "VERSION": "0.1.0",
+    "DESCRIPTION": (BASE_DIR / "config" / "openapi_description.md").read_text(
+        encoding="utf-8"
+    ),
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+    # Separate *Request components for write-only/read-only fields.
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/",
 }
 
 SESSION_COOKIE_AGE = 1209600
@@ -109,6 +132,8 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+# JSON error for /api/ paths instead of Django's HTML page.
+CSRF_FAILURE_VIEW = "apps.core.views.csrf_failure"
 
 # Cross-origin access is not needed by the frontend; kept for future integrations.
 CORS_ALLOWED_ORIGINS = env_list("DJANGO_CORS_ALLOWED_ORIGINS")
