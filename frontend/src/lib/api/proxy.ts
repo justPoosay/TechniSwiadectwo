@@ -17,6 +17,8 @@ const FORWARDED_REQUEST_HEADERS = [
   "user-agent",
   "x-csrftoken",
   "x-forwarded-for",
+  // Active school (apps.core.middleware.ActiveSchoolMiddleware).
+  "x-school-id",
 ];
 
 const DROPPED_RESPONSE_HEADERS = new Set([
