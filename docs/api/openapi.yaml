@@ -1,0 +1,580 @@
+openapi: 3.0.3
+info:
+  title: TechniŚwiadectwo API
+  version: 0.1.0
+  description: |
+    API modułu dokumentacji szkolnej TechniŚwiadectwo (POC, wyłącznie dane fikcyjne).
+
+    Frontend wywołuje API przez reverse proxy Next.js pod tym samym adresem (`/api/...`).
+
+    ## Uwierzytelnianie
+
+    1. `GET /api/auth/csrf/` ustawia cookie `csrftoken`.
+    2. `POST /api/auth/login/` z nagłówkiem `X-CSRFToken: <csrftoken>` tworzy sesję (cookie `sessionid`, HttpOnly).
+    3. Każde żądanie `POST`/`PUT`/`PATCH`/`DELETE` wymaga nagłówka `X-CSRFToken`. Logowanie obraca token, więc trzeba odczytać nową wartość cookie.
+
+    Statusy: **401** = brak sesji (trzeba się zalogować), **403** = brak uprawnień albo błąd CSRF.
+
+    ## Kontekst szkoły
+
+    Endpointy danych szkoły wymagają nagłówka `X-School-ID` z identyfikatorem szkoły, w której użytkownik ma aktywne członkostwo (lista w `GET /api/auth/me/` → `memberships`). Bez niego lub dla obcej szkoły odpowiedź to 403.
+
+    ## Paginacja
+
+    Listy przyjmują `?page=<n>&page_size=<n>` (domyślnie 25, maksymalnie 100) i zwracają:
+
+    ```json
+    {"count": 123, "page": 1, "page_size": 25, "total_pages": 5, "results": []}
+    ```
+
+    Strona spoza zakresu daje 404.
+
+    ## Filtrowanie, wyszukiwanie, sortowanie
+
+    - filtry: parametry nazwane jak pola, np. `?action=login`;
+    - wyszukiwanie tekstowe: `?search=<tekst>`;
+    - sortowanie: `?ordering=created_at` (rosnąco) lub `?ordering=-created_at` (malejąco).
+
+    Dostępne parametry są opisane przy każdym endpoincie.
+
+    ## Format błędów
+
+    Każdy błąd ma ten sam kształt (`ErrorResponse`):
+
+    ```json
+    {
+      "code": "validation_error",
+      "detail": "Popraw zaznaczone pola formularza.",
+      "field_errors": {"email": ["Wprowadź poprawny adres e-mail."]}
+    }
+    ```
+
+    | Status | `code` |
+    | --- | --- |
+    | 400 | `validation_error`, `parse_error` |
+    | 401 | `not_authenticated` |
+    | 403 | `permission_denied`, `csrf_failed` |
+    | 404 | `not_found` |
+    | 405 | `method_not_allowed` |
+    | 500 | `server_error` |
+    | 502 / 504 | `backend_unavailable` / `backend_timeout` (zwraca proxy Next.js) |
+
+    `field_errors` występuje tylko przy błędach walidacji. Pola zagnieżdżone mają klucze z kropką, np. `guardians.0.phone`.
+paths:
+  /api/audit-logs/:
+    get:
+      operationId: audit_logs_list
+      description: Dziennik audytu szkoły (tylko odczyt).
+      parameters:
+      - in: header
+        name: X-School-ID
+        schema:
+          type: string
+          format: uuid
+        description: Identyfikator szkoły, w kontekście której wykonywane jest żądanie.
+          Użytkownik musi mieć aktywne członkostwo w tej szkole.
+        required: true
+      - in: query
+        name: action
+        schema:
+          type: string
+          title: Operacja
+          enum:
+          - create
+          - delete
+          - login
+          - update
+        description: |-
+          * `create` - Tworzenie
+          * `update` - Edycja
+          * `delete` - Usuwanie
+          * `login` - Logowanie
+      - in: query
+        name: actor
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: created_after
+        schema:
+          type: string
+          format: date-time
+        description: Zdarzenia od (ISO 8601)
+      - in: query
+        name: created_before
+        schema:
+          type: string
+          format: date-time
+        description: Zdarzenia do (ISO 8601)
+      - name: ordering
+        required: false
+        in: query
+        description: 'Sortowanie: nazwa pola rosnąco, z prefiksem `-` malejąco.'
+        schema:
+          type: string
+          enum:
+          - created_at
+          - -created_at
+          - action
+          - -action
+      - name: page
+        required: false
+        in: query
+        description: Numer strony (od 1).
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Liczba wyników na stronie (domyślnie 25, maks. 100).
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Wyszukiwanie tekstowe (bez rozróżniania wielkości liter).
+        schema:
+          type: string
+      - in: query
+        name: target_type
+        schema:
+          type: string
+      tags:
+      - audit-logs
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuditLogList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Nieprawidłowe dane (`code`: `validation_error`, szczegóły
+            w `field_errors`).'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+  /api/audit-logs/{id}/:
+    get:
+      operationId: audit_logs_retrieve
+      description: Dziennik audytu szkoły (tylko odczyt).
+      parameters:
+      - in: header
+        name: X-School-ID
+        schema:
+          type: string
+          format: uuid
+        description: Identyfikator szkoły, w kontekście której wykonywane jest żądanie.
+          Użytkownik musi mieć aktywne członkostwo w tej szkole.
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Wpis audytowy.
+        required: true
+      tags:
+      - audit-logs
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLog'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Nie znaleziono zasobu (`code`: `not_found`).'
+  /api/auth/csrf/:
+    get:
+      operationId: auth_csrf_retrieve
+      description: Ustawia cookie `csrftoken`, którego wartość należy odsyłać w nagłówku
+        `X-CSRFToken` przy żądaniach POST/PUT/PATCH/DELETE.
+      summary: Pobierz token CSRF
+      tags:
+      - auth
+      security:
+      - sessionAuth: []
+      - {}
+      responses:
+        '204':
+          description: Cookie `csrftoken` ustawione.
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: Tworzy sesję (cookie `sessionid`, HttpOnly). Wymaga `X-CSRFToken`.
+      summary: Zaloguj
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - sessionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Nieprawidłowe dane (`code`: `validation_error`, szczegóły
+            w `field_errors`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      summary: Wyloguj
+      tags:
+      - auth
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+  /api/auth/me/:
+    get:
+      operationId: auth_me_retrieve
+      description: Zwraca zalogowanego użytkownika wraz z członkostwami w szkołach
+        i rolami. 401 oznacza brak sesji.
+      summary: Bieżący użytkownik
+      tags:
+      - auth
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+  /api/health/:
+    get:
+      operationId: health_retrieve
+      summary: Stan aplikacji
+      tags:
+      - health
+      security:
+      - sessionAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+          description: ''
+components:
+  schemas:
+    ActionEnum:
+      enum:
+      - create
+      - update
+      - delete
+      - login
+      type: string
+      description: |-
+        * `create` - Tworzenie
+        * `update` - Edycja
+        * `delete` - Usuwanie
+        * `login` - Logowanie
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        actor_email:
+          type: string
+          format: email
+          readOnly: true
+          nullable: true
+        action:
+          allOf:
+          - $ref: '#/components/schemas/ActionEnum'
+          title: Operacja
+        target_type:
+          type: string
+          title: Typ obiektu
+          maxLength: 100
+        target_id:
+          type: string
+          title: Identyfikator obiektu
+          maxLength: 255
+        changes:
+          title: Bezpieczny opis zmian
+        ip_address:
+          type: string
+          nullable: true
+          title: Adres IP
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Czas zdarzenia
+      required:
+      - action
+      - actor_email
+      - created_at
+      - id
+      - target_id
+      - target_type
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Stabilny kod błędu, np. `validation_error`, `not_authenticated`,
+            `permission_denied`, `csrf_failed`, `not_found`, `server_error`.
+        detail:
+          type: string
+          description: Komunikat do wyświetlenia użytkownikowi.
+        field_errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Błędy poszczególnych pól (tylko dla `validation_error`). Pola
+            zagnieżdżone mają klucze z kropką, np. `guardians.0.phone`.
+      required:
+      - code
+      - detail
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+      - status
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    Message:
+      type: object
+      properties:
+        detail:
+          type: string
+      required:
+      - detail
+    PaginatedAuditLogList:
+      type: object
+      required:
+      - count
+      - page
+      - page_size
+      - total_pages
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          description: Liczba wszystkich wyników.
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 25
+        total_pages:
+          type: integer
+          example: 5
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
+    RoleEnum:
+      enum:
+      - secretariat
+      - teacher
+      - homeroom_teacher
+      - principal
+      - admin
+      type: string
+      description: |-
+        * `secretariat` - Sekretariat
+        * `teacher` - Nauczyciel
+        * `homeroom_teacher` - Wychowawca
+        * `principal` - Dyrekcja
+        * `admin` - Administrator
+    SchoolMembership:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        school:
+          type: string
+          format: uuid
+          title: Szkoła
+        school_name:
+          type: string
+          readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleEnum'
+          title: Rola
+        role_display:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          title: Aktywne
+      required:
+      - id
+      - role
+      - role_display
+      - school
+      - school_name
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          title: Adres e-mail
+          maxLength: 254
+        first_name:
+          type: string
+          title: Imię
+          maxLength: 150
+        last_name:
+          type: string
+          title: Nazwisko
+          maxLength: 150
+        full_name:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          title: Aktywne konto
+        is_staff:
+          type: boolean
+          title: Dostęp do panelu admina
+        date_joined:
+          type: string
+          format: date-time
+          title: Data dołączenia
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+          title: Ostatnia aktywność
+        memberships:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchoolMembership'
+          readOnly: true
+      required:
+      - email
+      - first_name
+      - full_name
+      - id
+      - last_name
+      - memberships
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+      description: Sesja Django ustawiana przez `POST /api/auth/login/` (cookie HttpOnly).
+        Żądania zmieniające dane wymagają nagłówka `X-CSRFToken` z wartością cookie
+        `csrftoken` (`GET /api/auth/csrf/`).

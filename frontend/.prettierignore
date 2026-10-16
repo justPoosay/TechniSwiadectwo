@@ -5,3 +5,5 @@ build
 coverage
 public
 package-lock.json
+# Generated from docs/api/openapi.yaml (npm run api:types)
+src/lib/api/schema.ts

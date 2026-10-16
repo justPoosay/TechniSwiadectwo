@@ -37,6 +37,7 @@ describe("proxyToBackend", () => {
       headers: {
         cookie: "sessionid=abc; csrftoken=xyz",
         "x-csrftoken": "xyz",
+        "x-school-id": "school-1",
         origin: "http://localhost:3000",
         authorization: "Basic c2VjcmV0",
         "x-custom": "nope",
@@ -48,6 +49,7 @@ describe("proxyToBackend", () => {
     const headers = fetchImpl.mock.calls[0][1]?.headers as Headers;
     expect(headers.get("cookie")).toBe("sessionid=abc; csrftoken=xyz");
     expect(headers.get("x-csrftoken")).toBe("xyz");
+    expect(headers.get("x-school-id")).toBe("school-1");
     expect(headers.get("origin")).toBe("http://localhost:3000");
     expect(headers.get("x-forwarded-proto")).toBe("http");
     expect(headers.get("authorization")).toBeNull();

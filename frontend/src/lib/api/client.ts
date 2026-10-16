@@ -1,10 +1,11 @@
 import { ApiError, errorFromResponse, networkError } from "./errors";
+import type { paths } from "./schema";
+import type { CallArgs, HttpMethod, Operation, PathsWith, ResponseData } from "./types";
 
 // Browser API client. All calls go to the same-origin /api proxy, so the HttpOnly
 // session cookie is attached by the browser; nothing auth-related is kept in JS
 // memory or localStorage. The only cookie read here is the (non-secret) CSRF token.
 
-const API_PREFIX = "/api";
 const CSRF_COOKIE = "csrftoken";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -13,6 +14,8 @@ type QueryValue = string | number | boolean | null | undefined;
 export type ApiRequestOptions = Omit<RequestInit, "body" | "credentials"> & {
   body?: unknown;
   query?: Record<string, QueryValue>;
+  /** Sent as X-School-ID: the school the request is about. */
+  schoolId?: string;
 };
 
 export function readCookie(name: string): string | null {
@@ -25,15 +28,26 @@ export function readCookie(name: string): string | null {
 }
 
 export function buildApiUrl(path: string, query?: Record<string, QueryValue>): string {
-  if (!path.startsWith("/") || path.startsWith("//")) {
-    throw new Error(`API path must be relative to ${API_PREFIX}, got "${path}"`);
+  if (!path.startsWith("/api/")) {
+    throw new Error(`API path must start with "/api/", got "${path}"`);
   }
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== null) params.append(key, String(value));
   }
   const search = params.toString();
-  return `${API_PREFIX}${path}${search ? `?${search}` : ""}`;
+  return `${path}${search ? `?${search}` : ""}`;
+}
+
+/** "/api/audit-logs/{id}/" + {id: "x"} -> "/api/audit-logs/x/" */
+export function fillPath(template: string, params: Record<string, unknown> = {}): string {
+  return template.replace(/\{(\w+)\}/g, (_, name: string) => {
+    const value = params[name];
+    if (value === undefined || value === null || value === "") {
+      throw new Error(`Missing path parameter "${name}" for ${template}`);
+    }
+    return encodeURIComponent(String(value));
+  });
 }
 
 async function ensureCsrfToken(): Promise<string> {
@@ -41,7 +55,7 @@ async function ensureCsrfToken(): Promise<string> {
   if (existing) return existing;
 
   try {
-    await fetch(buildApiUrl("/auth/csrf/"), { credentials: "same-origin", cache: "no-store" });
+    await fetch("/api/auth/csrf/", { credentials: "same-origin", cache: "no-store" });
   } catch {
     throw networkError();
   }
@@ -56,11 +70,13 @@ async function ensureCsrfToken(): Promise<string> {
   return token;
 }
 
+/** Untyped low-level request. Prefer the typed `api` below. */
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const { body, query, headers: extraHeaders, method = "GET", ...init } = options;
+  const { body, query, schoolId, headers: extraHeaders, method = "GET", ...init } = options;
   const upperMethod = method.toUpperCase();
   const headers = new Headers(extraHeaders);
   headers.set("Accept", "application/json");
+  if (schoolId) headers.set("X-School-ID", schoolId);
 
   let payload: BodyInit | undefined;
   if (body instanceof FormData) {
@@ -99,15 +115,39 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   return (await response.json()) as T;
 }
 
-export const api = {
-  get: <T>(path: string, options?: Omit<ApiRequestOptions, "method" | "body">) =>
-    apiFetch<T>(path, { ...options, method: "GET" }),
-  post: <T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, "method" | "body">) =>
-    apiFetch<T>(path, { ...options, method: "POST", body }),
-  put: <T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, "method" | "body">) =>
-    apiFetch<T>(path, { ...options, method: "PUT", body }),
-  patch: <T>(path: string, body?: unknown, options?: Omit<ApiRequestOptions, "method" | "body">) =>
-    apiFetch<T>(path, { ...options, method: "PATCH", body }),
-  delete: <T>(path: string, options?: Omit<ApiRequestOptions, "method" | "body">) =>
-    apiFetch<T>(path, { ...options, method: "DELETE" }),
+type RuntimeOptions = {
+  path?: Record<string, unknown>;
+  query?: Record<string, QueryValue>;
+  body?: unknown;
+  schoolId?: string;
+  signal?: AbortSignal;
+  headers?: HeadersInit;
 };
+
+function method<M extends HttpMethod>(name: M) {
+  return <P extends PathsWith<M>>(
+    path: P,
+    ...[options]: CallArgs<Operation<P, M>>
+  ): Promise<ResponseData<Operation<P, M>>> => {
+    const { path: pathParams, ...rest } = (options ?? {}) as RuntimeOptions;
+    return apiFetch(fillPath(path, pathParams), { ...rest, method: name.toUpperCase() });
+  };
+}
+
+/**
+ * Typed client generated from the OpenAPI contract: paths, parameters, request
+ * bodies and responses are checked against docs/api/openapi.yaml.
+ *
+ *   const user = await api.get("/api/auth/me/");
+ *   const page = await api.get("/api/audit-logs/", { schoolId, query: { page: 2 } });
+ *   await api.post("/api/auth/login/", { body: { email, password } });
+ */
+export const api = {
+  get: method("get"),
+  post: method("post"),
+  put: method("put"),
+  patch: method("patch"),
+  delete: method("delete"),
+};
+
+export type ApiPath = keyof paths;

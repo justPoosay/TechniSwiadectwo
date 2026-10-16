@@ -1,5 +1,7 @@
-from rest_framework import authentication
+from rest_framework import authentication, exceptions
 from rest_framework.request import Request
+
+from apps.core.errors import CSRF_FAILED_CODE, CSRF_FAILED_DETAIL
 
 
 class SessionAuthentication(authentication.SessionAuthentication):
@@ -13,3 +15,13 @@ class SessionAuthentication(authentication.SessionAuthentication):
 
     def authenticate_header(self, request: Request) -> str:
         return 'Session realm="api"'
+
+    def enforce_csrf(self, request: Request) -> None:
+        # Same code and message as CSRF_FAILURE_VIEW, instead of DRF's English
+        # "CSRF Failed: ..." with the generic permission_denied code.
+        try:
+            super().enforce_csrf(request)
+        except exceptions.PermissionDenied as error:
+            raise exceptions.PermissionDenied(
+                CSRF_FAILED_DETAIL, code=CSRF_FAILED_CODE
+            ) from error
