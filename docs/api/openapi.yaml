@@ -345,6 +345,165 @@ paths:
               schema:
                 $ref: '#/components/schemas/Health'
           description: ''
+  /api/students/:
+    get:
+      operationId: students_list
+      description: Lista uczniów szkoły z paginacją, wyszukiwaniem i filtrowaniem.
+      summary: Lista uczniów
+      parameters:
+      - in: header
+        name: X-School-ID
+        schema:
+          type: string
+          format: uuid
+        description: Identyfikator szkoły, w kontekście której wykonywane jest żądanie.
+          Użytkownik musi mieć aktywne członkostwo w tej szkole.
+        required: true
+      - in: query
+        name: academic_year
+        schema:
+          type: string
+          format: uuid
+        description: Rok szkolny klasy (UUID)
+      - in: query
+        name: cohort
+        schema:
+          type: string
+          format: uuid
+        description: Klasa (UUID)
+      - name: ordering
+        required: false
+        in: query
+        description: 'Sortowanie: nazwa pola rosnąco, z prefiksem `-` malejąco.'
+        schema:
+          type: string
+          enum:
+          - last_name
+          - -last_name
+          - first_name
+          - -first_name
+          - register_number
+          - -register_number
+          - date_of_birth
+          - -date_of_birth
+          - created_at
+          - -created_at
+      - name: page
+        required: false
+        in: query
+        description: Numer strony (od 1).
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Liczba wyników na stronie (domyślnie 25, maks. 100).
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Wyszukiwanie tekstowe (bez rozróżniania wielkości liter).
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          title: Status ucznia
+          enum:
+          - ACTIVE
+          - GRADUATED
+          - WITHDRAWN
+        description: |-
+          Status ucznia
+
+          * `ACTIVE` - Uczęszcza (Aktywny)
+          * `GRADUATED` - Absolwent (Ukończył szkołę)
+          * `WITHDRAWN` - Odszedł / Skreślony
+      tags:
+      - students
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStudentListList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Nieprawidłowe dane (`code`: `validation_error`, szczegóły
+            w `field_errors`).'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+  /api/students/{id}/:
+    get:
+      operationId: students_retrieve
+      description: Szczegółowe dane ucznia wraz z historią przebiegu nauki i rejestrem
+        korekt.
+      summary: Szczegóły ucznia
+      parameters:
+      - in: header
+        name: X-School-ID
+        schema:
+          type: string
+          format: uuid
+        description: Identyfikator szkoły, w kontekście której wykonywane jest żądanie.
+          Użytkownik musi mieć aktywne członkostwo w tej szkole.
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Uczeń.
+        required: true
+      tags:
+      - students
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDetail'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Nie znaleziono zasobu (`code`: `not_found`).'
 components:
   schemas:
     ActionEnum:
@@ -401,6 +560,34 @@ components:
       - id
       - target_id
       - target_type
+    BlankEnum:
+      enum:
+      - ''
+    CohortNested:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          title: Nazwa Klasy
+          maxLength: 10
+        level:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          title: Poziom
+        academic_year_name:
+          type: string
+          readOnly: true
+      required:
+      - academic_year_name
+      - id
+      - level
+      - name
     ErrorResponse:
       type: object
       properties:
@@ -422,6 +609,24 @@ components:
       required:
       - code
       - detail
+    EventTypeEnum:
+      enum:
+      - ADMISSION
+      - CLASS_ASSIGNMENT
+      - PROMOTION
+      - REPEAT
+      - TRANSFER
+      - GRADUATION
+      - WITHDRAWAL
+      type: string
+      description: |-
+        * `ADMISSION` - Przyjęcie do szkoły
+        * `CLASS_ASSIGNMENT` - Przypisanie do klasy
+        * `PROMOTION` - Promocja do następnej klasy
+        * `REPEAT` - Powtarzanie klasy
+        * `TRANSFER` - Przeniesienie do innej klasy
+        * `GRADUATION` - Ukończenie szkoły
+        * `WITHDRAWAL` - Odejście ze szkoły
     Health:
       type: object
       properties:
@@ -429,6 +634,16 @@ components:
           type: string
       required:
       - status
+    IdDocumentTypeEnum:
+      enum:
+      - PASSPORT
+      - ID_CARD
+      - OTHER
+      type: string
+      description: |-
+        * `PASSPORT` - Paszport
+        * `ID_CARD` - Dowód osobisty
+        * `OTHER` - Inny dokument tożsamości
     LoginRequest:
       type: object
       properties:
@@ -476,6 +691,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AuditLog'
+    PaginatedStudentListList:
+      type: object
+      required:
+      - count
+      - page
+      - page_size
+      - total_pages
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          description: Liczba wszystkich wyników.
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 25
+        total_pages:
+          type: integer
+          example: 5
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentList'
     RoleEnum:
       enum:
       - secretariat
@@ -520,6 +761,258 @@ components:
       - role_display
       - school
       - school_name
+    StatusEnum:
+      enum:
+      - ACTIVE
+      - GRADUATED
+      - WITHDRAWN
+      type: string
+      description: |-
+        * `ACTIVE` - Uczęszcza (Aktywny)
+        * `GRADUATED` - Absolwent (Ukończył szkołę)
+        * `WITHDRAWN` - Odszedł / Skreślony
+    StudentDataCorrection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        author_email:
+          type: string
+          format: email
+          readOnly: true
+          nullable: true
+        reason:
+          type: string
+          title: Powód korekty
+          description: Wyjaśnienie przyczyny zmiany istotnych danych (np. sprostowanie
+            błędu pisarskiego, zmiana nazwiska po orzeczeniu)
+        changed_fields:
+          title: Zmienione pola
+          description: 'Słownik reprezentujący różnice w postaci: {''field_name'':
+            {''old'': ..., ''new'': ...}}'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Czas korekty
+      required:
+      - author_email
+      - created_at
+      - id
+      - reason
+    StudentDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        first_name:
+          type: string
+          title: Imię
+          maxLength: 100
+        second_name:
+          type: string
+          title: Drugie imię
+          maxLength: 100
+        last_name:
+          type: string
+          title: Nazwisko
+          maxLength: 100
+        pesel:
+          type: string
+          nullable: true
+          title: Numer PESEL
+          maxLength: 11
+        id_document_type:
+          title: Rodzaj dokumentu tożsamości
+          oneOf:
+          - $ref: '#/components/schemas/IdDocumentTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        id_document_number:
+          type: string
+          title: Numer dokumentu tożsamości
+          maxLength: 50
+        register_number:
+          type: string
+          title: Numer w księdze uczniów
+          description: Numer ewidencyjny w księdze uczniów danej szkoły
+          maxLength: 50
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          title: Status ucznia
+        status_display:
+          type: string
+          readOnly: true
+        cohort:
+          allOf:
+          - $ref: '#/components/schemas/CohortNested'
+          readOnly: true
+          nullable: true
+        date_of_birth:
+          type: string
+          format: date
+          title: Data urodzenia
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        place_of_birth:
+          type: string
+          title: Miejsce urodzenia
+          maxLength: 100
+        history_entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentHistoryEntry'
+          readOnly: true
+        data_corrections:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentDataCorrection'
+          readOnly: true
+      required:
+      - cohort
+      - created_at
+      - data_corrections
+      - date_of_birth
+      - first_name
+      - history_entries
+      - id
+      - last_name
+      - place_of_birth
+      - register_number
+      - status_display
+      - updated_at
+    StudentHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        event_type:
+          allOf:
+          - $ref: '#/components/schemas/EventTypeEnum'
+          title: Typ zdarzenia
+        event_type_display:
+          type: string
+          readOnly: true
+        event_date:
+          type: string
+          format: date
+          title: Data zdarzenia
+        academic_year_name:
+          type: string
+          readOnly: true
+        source_cohort_name:
+          type: string
+          readOnly: true
+          nullable: true
+        target_cohort_name:
+          type: string
+          readOnly: true
+          nullable: true
+        document_number:
+          type: string
+          title: Numer uchwały / decyzji
+          description: np. numer uchwały Rady Pedagogicznej
+          maxLength: 100
+        notes:
+          type: string
+          title: Uwagi
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - academic_year_name
+      - created_at
+      - event_date
+      - event_type
+      - event_type_display
+      - id
+      - source_cohort_name
+      - target_cohort_name
+    StudentList:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        first_name:
+          type: string
+          title: Imię
+          maxLength: 100
+        second_name:
+          type: string
+          title: Drugie imię
+          maxLength: 100
+        last_name:
+          type: string
+          title: Nazwisko
+          maxLength: 100
+        pesel:
+          type: string
+          nullable: true
+          title: Numer PESEL
+          maxLength: 11
+        id_document_type:
+          title: Rodzaj dokumentu tożsamości
+          oneOf:
+          - $ref: '#/components/schemas/IdDocumentTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        id_document_number:
+          type: string
+          title: Numer dokumentu tożsamości
+          maxLength: 50
+        register_number:
+          type: string
+          title: Numer w księdze uczniów
+          description: Numer ewidencyjny w księdze uczniów danej szkoły
+          maxLength: 50
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          title: Status ucznia
+        status_display:
+          type: string
+          readOnly: true
+        cohort:
+          allOf:
+          - $ref: '#/components/schemas/CohortNested'
+          readOnly: true
+          nullable: true
+        date_of_birth:
+          type: string
+          format: date
+          title: Data urodzenia
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cohort
+      - created_at
+      - date_of_birth
+      - first_name
+      - id
+      - last_name
+      - register_number
+      - status_display
+      - updated_at
     User:
       type: object
       properties:

@@ -132,6 +132,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/students/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lista uczniów
+         * @description Lista uczniów szkoły z paginacją, wyszukiwaniem i filtrowaniem.
+         */
+        get: operations["students_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/students/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Szczegóły ucznia
+         * @description Szczegółowe dane ucznia wraz z historią przebiegu nauki i rejestrem korekt.
+         */
+        get: operations["students_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -165,6 +205,20 @@ export interface components {
              */
             readonly created_at: string;
         };
+        /** @enum {unknown} */
+        BlankEnum: "";
+        CohortNested: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Nazwa Klasy */
+            name: string;
+            /**
+             * Poziom
+             * Format: int64
+             */
+            level: number;
+            readonly academic_year_name: string;
+        };
         ErrorResponse: {
             /** @description Stabilny kod błędu, np. `validation_error`, `not_authenticated`, `permission_denied`, `csrf_failed`, `not_found`, `server_error`. */
             code: string;
@@ -175,9 +229,27 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /**
+         * @description * `ADMISSION` - Przyjęcie do szkoły
+         *     * `CLASS_ASSIGNMENT` - Przypisanie do klasy
+         *     * `PROMOTION` - Promocja do następnej klasy
+         *     * `REPEAT` - Powtarzanie klasy
+         *     * `TRANSFER` - Przeniesienie do innej klasy
+         *     * `GRADUATION` - Ukończenie szkoły
+         *     * `WITHDRAWAL` - Odejście ze szkoły
+         * @enum {string}
+         */
+        EventTypeEnum: "ADMISSION" | "CLASS_ASSIGNMENT" | "PROMOTION" | "REPEAT" | "TRANSFER" | "GRADUATION" | "WITHDRAWAL";
         Health: {
             status: string;
         };
+        /**
+         * @description * `PASSPORT` - Paszport
+         *     * `ID_CARD` - Dowód osobisty
+         *     * `OTHER` - Inny dokument tożsamości
+         * @enum {string}
+         */
+        IdDocumentTypeEnum: "PASSPORT" | "ID_CARD" | "OTHER";
         LoginRequest: {
             /** Format: email */
             email: string;
@@ -199,6 +271,20 @@ export interface components {
             /** @example 5 */
             total_pages: number;
             results: components["schemas"]["AuditLog"][];
+        };
+        PaginatedStudentListList: {
+            /**
+             * @description Liczba wszystkich wyników.
+             * @example 123
+             */
+            count: number;
+            /** @example 1 */
+            page: number;
+            /** @example 25 */
+            page_size: number;
+            /** @example 5 */
+            total_pages: number;
+            results: components["schemas"]["StudentList"][];
         };
         /**
          * @description * `secretariat` - Sekretariat
@@ -223,6 +309,130 @@ export interface components {
             readonly role_display: string;
             /** Aktywne */
             is_active?: boolean;
+        };
+        /**
+         * @description * `ACTIVE` - Uczęszcza (Aktywny)
+         *     * `GRADUATED` - Absolwent (Ukończył szkołę)
+         *     * `WITHDRAWN` - Odszedł / Skreślony
+         * @enum {string}
+         */
+        StatusEnum: "ACTIVE" | "GRADUATED" | "WITHDRAWN";
+        StudentDataCorrection: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: email */
+            readonly author_email: string | null;
+            /**
+             * Powód korekty
+             * @description Wyjaśnienie przyczyny zmiany istotnych danych (np. sprostowanie błędu pisarskiego, zmiana nazwiska po orzeczeniu)
+             */
+            reason: string;
+            /**
+             * Zmienione pola
+             * @description Słownik reprezentujący różnice w postaci: {'field_name': {'old': ..., 'new': ...}}
+             */
+            changed_fields?: unknown;
+            /**
+             * Czas korekty
+             * Format: date-time
+             */
+            readonly created_at: string;
+        };
+        StudentDetail: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Imię */
+            first_name: string;
+            /** Drugie imię */
+            second_name?: string;
+            /** Nazwisko */
+            last_name: string;
+            /** Numer PESEL */
+            pesel?: string | null;
+            /** Rodzaj dokumentu tożsamości */
+            id_document_type?: components["schemas"]["IdDocumentTypeEnum"] | components["schemas"]["BlankEnum"];
+            /** Numer dokumentu tożsamości */
+            id_document_number?: string;
+            /**
+             * Numer w księdze uczniów
+             * @description Numer ewidencyjny w księdze uczniów danej szkoły
+             */
+            register_number: string;
+            /** Status ucznia */
+            status?: components["schemas"]["StatusEnum"];
+            readonly status_display: string;
+            readonly cohort: components["schemas"]["CohortNested"] | null;
+            /**
+             * Data urodzenia
+             * Format: date
+             */
+            date_of_birth: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+            /** Miejsce urodzenia */
+            place_of_birth: string;
+            readonly history_entries: components["schemas"]["StudentHistoryEntry"][];
+            readonly data_corrections: components["schemas"]["StudentDataCorrection"][];
+        };
+        StudentHistoryEntry: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Typ zdarzenia */
+            event_type: components["schemas"]["EventTypeEnum"];
+            readonly event_type_display: string;
+            /**
+             * Data zdarzenia
+             * Format: date
+             */
+            event_date: string;
+            readonly academic_year_name: string;
+            readonly source_cohort_name: string | null;
+            readonly target_cohort_name: string | null;
+            /**
+             * Numer uchwały / decyzji
+             * @description np. numer uchwały Rady Pedagogicznej
+             */
+            document_number?: string;
+            /** Uwagi */
+            notes?: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        StudentList: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Imię */
+            first_name: string;
+            /** Drugie imię */
+            second_name?: string;
+            /** Nazwisko */
+            last_name: string;
+            /** Numer PESEL */
+            pesel?: string | null;
+            /** Rodzaj dokumentu tożsamości */
+            id_document_type?: components["schemas"]["IdDocumentTypeEnum"] | components["schemas"]["BlankEnum"];
+            /** Numer dokumentu tożsamości */
+            id_document_number?: string;
+            /**
+             * Numer w księdze uczniów
+             * @description Numer ewidencyjny w księdze uczniów danej szkoły
+             */
+            register_number: string;
+            /** Status ucznia */
+            status?: components["schemas"]["StatusEnum"];
+            readonly status_display: string;
+            readonly cohort: components["schemas"]["CohortNested"] | null;
+            /**
+             * Data urodzenia
+             * Format: date
+             */
+            date_of_birth: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
         };
         User: {
             /** Format: uuid */
@@ -533,6 +743,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    students_list: {
+        parameters: {
+            query?: {
+                /** @description Rok szkolny klasy (UUID) */
+                academic_year?: string;
+                /** @description Klasa (UUID) */
+                cohort?: string;
+                /** @description Sortowanie: nazwa pola rosnąco, z prefiksem `-` malejąco. */
+                ordering?: "last_name" | "-last_name" | "first_name" | "-first_name" | "register_number" | "-register_number" | "date_of_birth" | "-date_of_birth" | "created_at" | "-created_at";
+                /** @description Numer strony (od 1). */
+                page?: number;
+                /** @description Liczba wyników na stronie (domyślnie 25, maks. 100). */
+                page_size?: number;
+                /** @description Wyszukiwanie tekstowe (bez rozróżniania wielkości liter). */
+                search?: string;
+                /**
+                 * @description Status ucznia
+                 *
+                 *     * `ACTIVE` - Uczęszcza (Aktywny)
+                 *     * `GRADUATED` - Absolwent (Ukończył szkołę)
+                 *     * `WITHDRAWN` - Odszedł / Skreślony
+                 */
+                status?: "ACTIVE" | "GRADUATED" | "WITHDRAWN";
+            };
+            header: {
+                /** @description Identyfikator szkoły, w kontekście której wykonywane jest żądanie. Użytkownik musi mieć aktywne członkostwo w tej szkole. */
+                "X-School-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedStudentListList"];
+                };
+            };
+            /** @description Nieprawidłowe dane (`code`: `validation_error`, szczegóły w `field_errors`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Brak zalogowanej sesji (`code`: `not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy token CSRF (`csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    students_retrieve: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Identyfikator szkoły, w kontekście której wykonywane jest żądanie. Użytkownik musi mieć aktywne członkostwo w tej szkole. */
+                "X-School-ID": string;
+            };
+            path: {
+                /** @description A UUID string identifying this Uczeń. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentDetail"];
+                };
+            };
+            /** @description Brak zalogowanej sesji (`code`: `not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy token CSRF (`csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Nie znaleziono zasobu (`code`: `not_found`). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

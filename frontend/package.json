@@ -12,8 +12,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "api:types": "openapi-typescript ../docs/api/openapi.yaml -o src/lib/api/schema.ts",
-    "api:types:check": "openapi-typescript ../docs/api/openapi.yaml -o src/lib/api/schema.ts --check"
+    "api:types": "npx openapi-typescript ../docs/api/openapi.yaml -o src/lib/api/schema.ts",
+    "api:types:check": "npx openapi-typescript ../docs/api/openapi.yaml -o src/lib/api/schema.ts --check"
   },
   "dependencies": {
     "next": "16.3.6",
