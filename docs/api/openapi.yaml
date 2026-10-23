@@ -64,7 +64,10 @@ paths:
   /api/audit-logs/:
     get:
       operationId: audit_logs_list
-      description: Dziennik audytu szkoły (tylko odczyt).
+      description: |-
+        Dziennik audytu szkoły (tylko odczyt).
+
+        **Wymagane role w szkole:** `principal`, `admin` (inne role: 403).
       parameters:
       - in: header
         name: X-School-ID
@@ -173,7 +176,10 @@ paths:
   /api/audit-logs/{id}/:
     get:
       operationId: audit_logs_retrieve
-      description: Dziennik audytu szkoły (tylko odczyt).
+      description: |-
+        Dziennik audytu szkoły (tylko odczyt).
+
+        **Wymagane role w szkole:** `principal`, `admin` (inne role: 403).
       parameters:
       - in: header
         name: X-School-ID
@@ -476,7 +482,10 @@ paths:
   /api/students/:
     get:
       operationId: students_list
-      description: Lista uczniów szkoły z paginacją, wyszukiwaniem i filtrowaniem.
+      description: |-
+        Lista uczniów szkoły z paginacją, wyszukiwaniem i filtrowaniem.
+
+        **Wymagane role w szkole:** `secretariat`, `principal`, `admin` (inne role: 403).
       summary: Lista uczniów
       parameters:
       - in: header
@@ -583,8 +592,10 @@ paths:
   /api/students/{id}/:
     get:
       operationId: students_retrieve
-      description: Szczegółowe dane ucznia wraz z historią przebiegu nauki i rejestrem
-        korekt.
+      description: |-
+        Szczegółowe dane ucznia wraz z historią przebiegu nauki i rejestrem korekt.
+
+        **Wymagane role w szkole:** `secretariat`, `principal`, `admin` (inne role: 403).
       summary: Szczegóły ucznia
       parameters:
       - in: header

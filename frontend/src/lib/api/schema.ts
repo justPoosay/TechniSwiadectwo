@@ -11,7 +11,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Dziennik audytu szkoły (tylko odczyt). */
+        /**
+         * @description Dziennik audytu szkoły (tylko odczyt).
+         *
+         *     **Wymagane role w szkole:** `principal`, `admin` (inne role: 403).
+         */
         get: operations["audit_logs_list"];
         put?: never;
         post?: never;
@@ -28,7 +32,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Dziennik audytu szkoły (tylko odczyt). */
+        /**
+         * @description Dziennik audytu szkoły (tylko odczyt).
+         *
+         *     **Wymagane role w szkole:** `principal`, `admin` (inne role: 403).
+         */
         get: operations["audit_logs_retrieve"];
         put?: never;
         post?: never;
@@ -176,6 +184,8 @@ export interface paths {
         /**
          * Lista uczniów
          * @description Lista uczniów szkoły z paginacją, wyszukiwaniem i filtrowaniem.
+         *
+         *     **Wymagane role w szkole:** `secretariat`, `principal`, `admin` (inne role: 403).
          */
         get: operations["students_list"];
         put?: never;
@@ -196,6 +206,8 @@ export interface paths {
         /**
          * Szczegóły ucznia
          * @description Szczegółowe dane ucznia wraz z historią przebiegu nauki i rejestrem korekt.
+         *
+         *     **Wymagane role w szkole:** `secretariat`, `principal`, `admin` (inne role: 403).
          */
         get: operations["students_retrieve"];
         put?: never;

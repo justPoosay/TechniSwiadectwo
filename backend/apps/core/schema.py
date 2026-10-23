@@ -95,6 +95,18 @@ class AutoSchema(SpectacularAutoSchema):
                 responses[code] = response
         return responses
 
+    def get_operation(self, *args: Any, **kwargs: Any) -> Any:
+        operation = super().get_operation(*args, **kwargs)
+        roles = getattr(self.view, "allowed_roles", None)
+        if operation and roles:
+            names = ", ".join(f"`{role}`" for role in roles)
+            note = f"**Wymagane role w szkole:** {names} (inne role: 403)."
+            description = operation.get("description")
+            operation["description"] = (
+                f"{description}\n\n{note}" if description else note
+            )
+        return operation
+
     def get_override_parameters(self) -> list[Any]:
         parameters = list(super().get_override_parameters())
         if isinstance(self.view, SchoolScopedViewSetMixin):

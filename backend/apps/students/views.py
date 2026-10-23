@@ -5,10 +5,11 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import viewsets
 
 from apps.core.mixins import SchoolScopedViewSetMixin
-from apps.core.permissions import IsSchoolMember
+from apps.core.permissions import HasSchoolRole
 from apps.students.filters import StudentFilter
 from apps.students.models import Student
 from apps.students.serializers import StudentDetailSerializer, StudentListSerializer
+from apps.users.models import SchoolMembership
 
 
 @extend_schema_view(
@@ -25,7 +26,12 @@ from apps.students.serializers import StudentDetailSerializer, StudentListSerial
 )
 class StudentViewSet(SchoolScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Student.objects.all()
-    permission_classes = [IsSchoolMember]
+    permission_classes = [HasSchoolRole]
+    allowed_roles = [
+        SchoolMembership.Role.SECRETARIAT,
+        SchoolMembership.Role.PRINCIPAL,
+        SchoolMembership.Role.ADMIN,
+    ]
     http_method_names = ["get", "head", "options"]
     filterset_class = StudentFilter
     search_fields = ["first_name", "last_name", "pesel", "register_number"]

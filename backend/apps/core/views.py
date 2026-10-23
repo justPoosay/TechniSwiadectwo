@@ -19,7 +19,8 @@ from apps.core.errors import (
 from apps.core.filters import AuditLogFilter
 from apps.core.mixins import SchoolScopedViewSetMixin
 from apps.core.models import AuditLog, Cohort
-from apps.core.permissions import IsSchoolMember
+from apps.core.permissions import HasSchoolRole
+from apps.users.models import SchoolMembership
 
 
 @extend_schema(
@@ -57,7 +58,8 @@ class AuditLogViewSet(SchoolScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     queryset = AuditLog.objects.select_related("actor")
     serializer_class = AuditLogSerializer
-    permission_classes = [IsSchoolMember]
+    permission_classes = [HasSchoolRole]
+    allowed_roles = [SchoolMembership.Role.PRINCIPAL, SchoolMembership.Role.ADMIN]
     http_method_names = ["get", "head", "options"]
     filterset_class = AuditLogFilter
     search_fields = ["target_type", "target_id"]
@@ -81,7 +83,7 @@ class CohortViewSet(SchoolScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
     queryset = Cohort.objects.select_related("academic_year")
     serializer_class = CohortSerializer
-    permission_classes = [IsSchoolMember]
+    permission_classes = [HasSchoolRole]
     http_method_names = ["get", "head", "options"]
     filterset_fields = ["academic_year"]
     ordering_fields = ["name", "level"]

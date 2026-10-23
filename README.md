@@ -417,3 +417,32 @@ Wdrożono szkielet interfejsu chronionego (`AppLayout`) dostosowany do roli uży
 **Dane z API** pobiera hook `useApiQuery` (`frontend/src/lib/api/use-api-query.ts`) przez typowany klient z T23. Przerywa nieaktualne żądania (szybkie przełączanie stron i filtrów nie pokaże spóźnionej odpowiedzi) i pokazuje poprzednią stronę, dopóki ładuje się następna.
 
 Nowy endpoint dla filtra klas: **`GET /api/cohorts/`**, czyli klasy aktywnej szkoły (tylko odczyt, najnowszy rok szkolny pierwszy, filtr `?academic_year=`).
+
+### T28. Dodać testy uwierzytelniania i izolacji
+
+**Uprawnienia ról w backendzie.** Do tej pory każdy członek szkoły mógł odczytać każdy endpoint szkoły, a role ograniczał tylko interfejs. Teraz backend sprawdza rolę w aktywnej szkole (`HasSchoolRole` + `allowed_roles` w widoku). Macierz dostępu i kody odpowiedzi są w **[`docs/permissions.md`](docs/permissions.md)**, a wymagane role są też opisane przy operacjach w OpenAPI.
+
+**Testy backendu** (`backend/apps/core/tests/test_auth_isolation.py`):
+
+- macierz każda rola × każdy endpoint (200 albo 403 `permission_denied`) oraz 401 dla niezalogowanych;
+- izolacja szkół: obcy `X-School-ID` (także `?school_id=`) daje 403, obiekt innej szkoły daje 404, listy zawierają tylko dane własnej szkoły, rola liczona osobno w każdej szkole;
+- sesja: atrybuty cookie (HttpOnly, SameSite, czas życia), wygaśnięcie sesji daje 401, cookie bezużyteczne po wylogowaniu, dezaktywacja konta (401) i członkostwa (403) oraz zmiana roli działają od następnego żądania.
+
+**Testy E2E** (Playwright, `frontend/e2e/auth.spec.ts`), przechodzące przez przeglądarkę, proxy Next.js i Django:
+
+- przekierowanie niezalogowanego na logowanie i powrót na żądaną stronę, błędne hasło, sesja niedostępna dla JavaScriptu;
+- dla każdej z 5 ról: etykieta roli, menu i bezpośrednie wejście na `/students` (lista albo „Brak uprawnień (403)”), API odrzuca rolę także z pominięciem UI;
+- wylogowanie i utrata sesji przekierowują na logowanie;
+- uczeń innej szkoły nie pojawia się na liście i nie otwiera się pod bezpośrednim adresem.
+
+Dane testowe tworzy `python manage.py seed_e2e`: dwie fikcyjne szkoły, konto dla każdej roli i stałe identyfikatory. Komenda działa tylko przy `DEBUG=True`, bo konta mają znane hasło.
+
+Uruchomienie E2E lokalnie (na działającym Docker Compose):
+
+```bash
+docker exec ts_django_backend python manage.py seed_e2e
+npx --prefix frontend playwright install chromium   # jednorazowo
+npm run test:e2e
+```
+
+W CI osobny job **E2E (Playwright)** stawia Postgresa, Django z `seed_e2e` i produkcyjny build Next.js, uruchamia testy, a przy błędzie zapisuje raport i logi serwerów jako artefakt.
