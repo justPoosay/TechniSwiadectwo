@@ -18,7 +18,7 @@ from apps.core.errors import (
 )
 from apps.core.filters import AuditLogFilter
 from apps.core.mixins import SchoolScopedViewSetMixin
-from apps.core.models import AuditLog
+from apps.core.models import AuditLog, Cohort
 from apps.core.permissions import IsSchoolMember
 
 
@@ -63,6 +63,29 @@ class AuditLogViewSet(SchoolScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     search_fields = ["target_type", "target_id"]
     ordering_fields = ["created_at", "action"]
     ordering = ["-created_at"]
+
+
+class CohortSerializer(serializers.ModelSerializer):
+    academic_year_name = serializers.CharField(
+        source="academic_year.name", read_only=True
+    )
+
+    class Meta:
+        model = Cohort
+        fields = ["id", "name", "level", "academic_year", "academic_year_name"]
+
+
+@extend_schema(tags=["cohorts"])
+class CohortViewSet(SchoolScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """Klasy szkoły (tylko odczyt), np. do filtrowania listy uczniów."""
+
+    queryset = Cohort.objects.select_related("academic_year")
+    serializer_class = CohortSerializer
+    permission_classes = [IsSchoolMember]
+    http_method_names = ["get", "head", "options"]
+    filterset_fields = ["academic_year"]
+    ordering_fields = ["name", "level"]
+    ordering = ["-academic_year__start_date", "level", "name"]
 
 
 def _is_api_request(request: HttpRequest) -> bool:

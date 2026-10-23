@@ -329,6 +329,134 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
             token CSRF (`csrf_failed`).
+  /api/cohorts/:
+    get:
+      operationId: cohorts_list
+      description: Klasy szkoły (tylko odczyt), np. do filtrowania listy uczniów.
+      parameters:
+      - in: header
+        name: X-School-ID
+        schema:
+          type: string
+          format: uuid
+        description: Identyfikator szkoły, w kontekście której wykonywane jest żądanie.
+          Użytkownik musi mieć aktywne członkostwo w tej szkole.
+        required: true
+      - in: query
+        name: academic_year
+        schema:
+          type: string
+          format: uuid
+      - name: ordering
+        required: false
+        in: query
+        description: 'Sortowanie: nazwa pola rosnąco, z prefiksem `-` malejąco.'
+        schema:
+          type: string
+          enum:
+          - name
+          - -name
+          - level
+          - -level
+      - name: page
+        required: false
+        in: query
+        description: Numer strony (od 1).
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Liczba wyników na stronie (domyślnie 25, maks. 100).
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Wyszukiwanie tekstowe (bez rozróżniania wielkości liter).
+        schema:
+          type: string
+      tags:
+      - cohorts
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCohortList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Nieprawidłowe dane (`code`: `validation_error`, szczegóły
+            w `field_errors`).'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+  /api/cohorts/{id}/:
+    get:
+      operationId: cohorts_retrieve
+      description: Klasy szkoły (tylko odczyt), np. do filtrowania listy uczniów.
+      parameters:
+      - in: header
+        name: X-School-ID
+        schema:
+          type: string
+          format: uuid
+        description: Identyfikator szkoły, w kontekście której wykonywane jest żądanie.
+          Użytkownik musi mieć aktywne członkostwo w tej szkole.
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this Klasa.
+        required: true
+      tags:
+      - cohorts
+      security:
+      - sessionAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cohort'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Brak zalogowanej sesji (`code`: `not_authenticated`).'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy
+            token CSRF (`csrf_failed`).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Nie znaleziono zasobu (`code`: `not_found`).'
   /api/health/:
     get:
       operationId: health_retrieve
@@ -563,6 +691,32 @@ components:
     BlankEnum:
       enum:
       - ''
+    Cohort:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          title: Nazwa Klasy
+          maxLength: 10
+        level:
+          type: integer
+          title: Poziom
+        academic_year:
+          type: string
+          format: uuid
+        academic_year_name:
+          type: string
+          readOnly: true
+      required:
+      - academic_year
+      - academic_year_name
+      - id
+      - level
+      - name
     CohortNested:
       type: object
       properties:
@@ -576,9 +730,6 @@ components:
           maxLength: 10
         level:
           type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
           title: Poziom
         academic_year_name:
           type: string
@@ -691,6 +842,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AuditLog'
+    PaginatedCohortList:
+      type: object
+      required:
+      - count
+      - page
+      - page_size
+      - total_pages
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          description: Liczba wszystkich wyników.
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 25
+        total_pages:
+          type: integer
+          example: 5
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cohort'
     PaginatedStudentListList:
       type: object
       required:

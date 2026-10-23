@@ -12,6 +12,7 @@ from rest_framework.test import APIClient
 
 from apps.core.exceptions import exception_handler
 from apps.core.models import AuditLog, School
+from apps.core.schema import strip_database_integer_bounds
 from apps.users.models import SchoolMembership, User
 
 SCHEMA_FILE = Path(settings.BASE_DIR).parent / "docs" / "api" / "openapi.yaml"
@@ -298,3 +299,21 @@ class TestOpenApiSchema:
             "docs/api/openapi.yaml jest nieaktualny. Wygeneruj go poleceniem: "
             "npm run api:schema"
         )
+
+    def test_schema_does_not_depend_on_database_backend(self) -> None:
+        schema = {
+            "sqlite": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": -(2**63),
+                "maximum": 2**63 - 1,
+            },
+            "postgres": {"type": "integer", "minimum": -(2**31), "maximum": 2**31 - 1},
+            "explicit": {"type": "integer", "minimum": 1, "maximum": 8},
+        }
+
+        result = strip_database_integer_bounds(schema)
+
+        assert result["sqlite"] == {"type": "integer"}
+        assert result["postgres"] == {"type": "integer"}
+        assert result["explicit"] == {"type": "integer", "minimum": 1, "maximum": 8}

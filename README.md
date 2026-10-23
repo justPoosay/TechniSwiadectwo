@@ -276,4 +276,144 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
+### T21. Zaimplementować logowanie i wylogowanie
+
+### T22. Skonfigurować komunikację Next.js–Django
+
+Przeglądarka rozmawia wyłącznie z Next.js (ten sam origin). Każde żądanie `/api/*` jest przekazywane do Django przez route handler `frontend/src/app/api/[...path]/route.ts` (logika w `frontend/src/lib/api/proxy.ts`):
+
+```text
+przeglądarka ──/api/auth/me/──▶ Next.js :3000 ──BACKEND_URL/api/auth/me/──▶ Django :8000
+```
+
+- Adres Django ustawia zmienna **`BACKEND_URL`** (tylko po stronie serwera, nie trafia do przeglądarki): `http://localhost:8000` lokalnie, `http://backend:8000` w Docker Compose.
+- Proxy przekazuje tylko potrzebne nagłówki (cookie, `X-CSRFToken`, `X-School-ID`, `Origin`, `Referer`…), każde `Set-Cookie` osobno, usuwa `WWW-Authenticate` i nie ujawnia wewnętrznego adresu backendu w przekierowaniach. Gdy Django nie odpowiada, zwraca JSON `{"detail", "code"}` ze statusem 502 (`backend_unavailable`) albo 504 (`backend_timeout`).
+- `skipTrailingSlashRedirect` w `next.config.ts` zachowuje końcowy `/` wymagany przez URL-e Django.
+- Sesja: cookie `sessionid` jest `HttpOnly` + `SameSite=Lax`. Żadne tokeny ani dane osobowe nie są zapisywane w `localStorage`.
+- CSRF: `GET /api/auth/csrf/` ustawia cookie `csrftoken`, a klient odsyła je w nagłówku `X-CSRFToken` przy każdym żądaniu zmieniającym dane (także przy logowaniu).
+- Niezalogowany użytkownik dostaje **401**, zalogowany bez uprawnień **403**. Domyślnie każdy endpoint wymaga zalogowania (`IsAuthenticated`).
+
+Klient API dla komponentów jest opisany w T23 (typowany na podstawie OpenAPI).
+
+Zmienne Django: `DJANGO_ALLOWED_HOSTS` musi zawierać `backend` (host używany przez proxy w Dockerze), a `DJANGO_CSRF_TRUSTED_ORIGINS` adres frontendu (`http://localhost:3000`).
+
+### T23. Opublikować kontrakt OpenAPI
+
+Kontrakt API jest generowany z kodu Django przez [drf-spectacular](https://drf-spectacular.readthedocs.io/) i zapisany w repozytorium: **[`docs/api/openapi.yaml`](docs/api/openapi.yaml)**. Na jego podstawie powstają typy TypeScript dla Next.js (`frontend/src/lib/api/schema.ts`, [openapi-typescript](https://openapi-ts.dev/)).
+
+Dokumentacja na żywo (po uruchomieniu aplikacji, także przez proxy na `:3000`):
+
+| Adres | Co to jest |
+| --- | --- |
+| `/api/docs/` | Swagger UI: endpointy, parametry, przykładowe odpowiedzi, „Try it out” |
+| `/api/redoc/` | ReDoc: ta sama dokumentacja w formie do czytania |
+| `/api/schema/` | Schemat OpenAPI 3 (YAML, albo JSON z `Accept: application/json`) |
+
+Opis uwierzytelniania, nagłówka szkoły, paginacji i błędów znajduje się na początku dokumentacji (`backend/config/openapi_description.md`).
+
+**Ujednolicone konwencje API:**
+
+- **Błędy**: każdy błąd ma kształt `{"code", "detail", "field_errors?"}` (`ErrorResponse`), np. `validation_error`, `not_authenticated`, `permission_denied`, `csrf_failed`, `not_found`, `server_error`. Dotyczy też błędów spoza DRF (CSRF, nieznany URL `/api/...`, błąd 500).
+- **Paginacja**: `?page=&page_size=` (domyślnie 25, maks. 100) → `{"count", "page", "page_size", "total_pages", "results"}`. Bez absolutnych linków `next`/`previous`, które za proxy wskazywałyby wewnętrzny adres backendu.
+- **Filtrowanie**: `django-filter` + `?search=` + `?ordering=` (dozwolone wartości są enumem w schemacie).
+- **Szkoła**: endpointy danych szkoły wymagają nagłówka `X-School-ID` (opisany w schemacie jako wymagany).
+
+**Typowany klient** (`frontend/src/lib/api`) sprawdza ścieżki, parametry, body i odpowiedzi względem kontraktu w czasie kompilacji:
+
+```ts
+import { api, ApiError, type ApiSchema } from "@/lib/api";
+
+const user = await api.get("/api/auth/me/");                // user: ApiSchema["User"]
+await api.post("/api/auth/login/", { body: { email, password } });
+const page = await api.get("/api/audit-logs/", {
+  schoolId,                                                  // wymagane przez X-School-ID
+  query: { action: "login", ordering: "-created_at", page: 2 },
+});
+const log = await api.get("/api/audit-logs/{id}/", { schoolId, path: { id } });
+
+try {
+  await api.post("/api/auth/login/", { body: { email, password } });
+} catch (error) {
+  if (error instanceof ApiError) {
+    error.code;              // np. "validation_error"
+    error.message;           // komunikat do wyświetlenia
+    error.fieldErrors;       // { email: ["..."] } dla formularzy
+    error.isUnauthenticated; // 401 → przekierowanie do logowania
+  }
+}
+```
+
+Nieistniejąca ścieżka, brak `schoolId`, zła wartość `ordering` albo brak wymaganego pola w `body` to błąd `npm run type-check`.
+
+**Po zmianie API** (nowy endpoint, pole, filtr) wygeneruj kontrakt i typy z głównego katalogu (aktywne venv backendu):
+
+```bash
+npm run api:generate
+```
+
+i zacommituj `docs/api/openapi.yaml` oraz `frontend/src/lib/api/schema.ts`. CI pilnuje, żeby nie były nieaktualne: pytest porównuje schemat z kodem (`test_committed_schema_is_up_to_date`), a job frontendu uruchamia `npm run api:types:check`.
+
+### T24. Zbudować logowanie w Next.js
+
+Wdrożono kompletny mechanizm logowania i zarządzania sesją użytkownika:
+
+- **Formularz logowania (`/login`)**:
+  - Walidacja formularza po stronie klienta (e-mail, hasło) oraz prezentacja błędów pól (`field_errors`) i błędów ogólnych zwracanych przez API Django (`ErrorResponse`).
+  - Przełącznik widoczności hasła oraz stan wysyłania (spinner, blokada ponownego kliknięcia).
+- **Zarządzanie sesją (`AuthProvider`, `useAuth`)**:
+  - Automatyczne przywracanie sesji na starcie aplikacji (`GET /api/auth/me/`).
+  - Aktywna szkoła (`currentSchoolId`) oraz rola użytkownika (`currentMembership`).
+  - Funkcja wylogowania (`POST /api/auth/logout/`) czyszcząca stan sesji i przekierowująca do formularza logowania.
+- **Przekierowania**:
+  - Komponent `ProtectedRoute` automatycznie przekierowuje niezalogowanych użytkowników do `/login?next=<ścieżka>`.
+  - Po poprawnym zalogowaniu użytkownik wraca do żądanej strony (lub na pulpit `/`).
+  - Użytkownik zalogowany odwiedzający `/login` jest przekierowywany na pulpit.
+
+### T25. Zbudować szkielet chronionej aplikacji
+
+Wdrożono szkielet interfejsu chronionego (`AppLayout`) dostosowany do roli użytkownika:
+
+- **Menu zależne od roli (`AppSidebar`)**:
+  - **Nauczyciel (`teacher`)**: widok przedmiotów lekcyjnych (`/subjects`) oraz ocen cząstkowych (`/grades`).
+  - **Wychowawca (`homeroom_teacher`)**: widok powierzonej klasy (`/my-class`), arkuszy ocen klasy (`/grade-sheets`) oraz świadectw (`/certificates`).
+  - **Sekretariat (`secretariat`)**: księga uczniów (`/students`) oraz wydawanie świadectw (`/certificates`).
+  - **Dyrekcja (`principal`)**: zatwierdzenia dokumentów (`/approvals`), księga uczniów, świadectwa i dziennik audytu (`/audit`).
+  - **Administrator (`admin`)**: zarządzanie użytkownikami, dziennik audytu i ustawienia szkoły.
+- **Pasek górny (`AppHeader`)**:
+  - Nazwa i logo systemu.
+  - Wybór aktywnej szkoły (`SchoolSelector`) dla użytkowników o wielu przypisaniach.
+  - Dane użytkownika wraz z etykietą i kolorystyczną odznaką roli.
+  - Przycisk wylogowania z obsługą stanu ładowania.
+- **Ścieżka powrotu (`Breadcrumbs`)**:
+  - Dynamiczne generowanie okruszków nawigacyjnych na podstawie aktualnej trasy URL.
+- **Komponenty stanów aplikacji (`frontend/src/components/ui/states/`)**:
+  - Stan ładowania (`LoadingState`, `loading.tsx`) z animowanym wskaźnikiem i etykietą dostępności.
+  - Stan błędu (`ErrorState`, `error.tsx`) z kodem błędu i przyciskiem ponowienia akcji.
+  - Stan braku danych (`EmptyState`) z opisem i opcjonalnym przyciskiem akcji.
+  - Stan braku uprawnień (`UnauthorizedState`) informujący o odmowie dostępu (403 Forbidden) ze wskazaniem brakującej roli.
+
 ### T26. Dodać API listy i szczegółów ucznia
+
+- `GET /api/students/`: lista uczniów aktywnej szkoły (`X-School-ID`) z paginacją, wyszukiwaniem (`?search=` po imieniu, nazwisku, PESEL i numerze w księdze), filtrami (`?status=`, `?cohort=`, `?academic_year=`) i sortowaniem (`?ordering=`).
+- `GET /api/students/{id}/`: szczegóły ucznia z historią przebiegu nauki (`history_entries`) i rejestrem korekt danych (`data_corrections`). Uczeń innej szkoły daje 404.
+
+### T27. Zbudować listę i szczegóły ucznia w Next.js
+
+**Księga uczniów (`/students`)** (`frontend/src/components/students/students-list.tsx`):
+
+- tabela: nr w księdze, uczeń, PESEL lub dokument zastępczy, klasa, status, data urodzenia; nazwisko prowadzi do szczegółów;
+- wyszukiwanie z opóźnieniem 300 ms, filtry statusu i klasy, sortowanie po kliknięciu w nagłówek kolumny (`aria-sort`), paginacja;
+- status, klasa, sortowanie i numer strony są w URL, więc po powrocie ze szczegółów filtry zostają. **Tekst wyszukiwania celowo nie trafia do URL**, bo może zawierać nazwisko lub PESEL (dane osobowe nie mogą trafiać do adresów ani historii przeglądarki);
+- stany: ładowanie, błąd z ponowieniem, brak uprawnień (403), pusta księga, brak wyników dla filtrów (z „Wyczyść filtry”), brak aktywnej szkoły.
+
+**Szczegóły ucznia (`/students/[id]`)** (`frontend/src/components/students/student-details.tsx`):
+
+- dane ucznia (imiona, nazwisko, data i miejsce urodzenia, PESEL albo dokument zastępczy, nr w księdze, status);
+- obecna klasa i rok szkolny;
+- historia przebiegu nauki (przyjęcie, promocje, przeniesienia… z datą, rokiem, zmianą klasy i podstawą wpisu);
+- historia zmian danych: autor, czas, powód korekty i tabela „pole / było / jest”;
+- uczeń innej szkoły lub nieistniejący: „Nie znaleziono ucznia” z powrotem do listy.
+
+**Dane z API** pobiera hook `useApiQuery` (`frontend/src/lib/api/use-api-query.ts`) przez typowany klient z T23. Przerywa nieaktualne żądania (szybkie przełączanie stron i filtrów nie pokaże spóźnionej odpowiedzi) i pokazuje poprzednią stronę, dopóki ładuje się następna.
+
+Nowy endpoint dla filtra klas: **`GET /api/cohorts/`**, czyli klasy aktywnej szkoły (tylko odczyt, najnowszy rok szkolny pierwszy, filtr `?academic_year=`).

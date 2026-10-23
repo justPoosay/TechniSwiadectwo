@@ -115,6 +115,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cohorts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Klasy szkoły (tylko odczyt), np. do filtrowania listy uczniów. */
+        get: operations["cohorts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cohorts/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Klasy szkoły (tylko odczyt), np. do filtrowania listy uczniów. */
+        get: operations["cohorts_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health/": {
         parameters: {
             query?: never;
@@ -207,15 +241,23 @@ export interface components {
         };
         /** @enum {unknown} */
         BlankEnum: "";
+        Cohort: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Nazwa Klasy */
+            name: string;
+            /** Poziom */
+            level: number;
+            /** Format: uuid */
+            academic_year: string;
+            readonly academic_year_name: string;
+        };
         CohortNested: {
             /** Format: uuid */
             readonly id: string;
             /** Nazwa Klasy */
             name: string;
-            /**
-             * Poziom
-             * Format: int64
-             */
+            /** Poziom */
             level: number;
             readonly academic_year_name: string;
         };
@@ -271,6 +313,20 @@ export interface components {
             /** @example 5 */
             total_pages: number;
             results: components["schemas"]["AuditLog"][];
+        };
+        PaginatedCohortList: {
+            /**
+             * @description Liczba wszystkich wyników.
+             * @example 123
+             */
+            count: number;
+            /** @example 1 */
+            page: number;
+            /** @example 25 */
+            page_size: number;
+            /** @example 5 */
+            total_pages: number;
+            results: components["schemas"]["Cohort"][];
         };
         PaginatedStudentListList: {
             /**
@@ -719,6 +775,117 @@ export interface operations {
             };
             /** @description Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy token CSRF (`csrf_failed`). */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cohorts_list: {
+        parameters: {
+            query?: {
+                academic_year?: string;
+                /** @description Sortowanie: nazwa pola rosnąco, z prefiksem `-` malejąco. */
+                ordering?: "name" | "-name" | "level" | "-level";
+                /** @description Numer strony (od 1). */
+                page?: number;
+                /** @description Liczba wyników na stronie (domyślnie 25, maks. 100). */
+                page_size?: number;
+                /** @description Wyszukiwanie tekstowe (bez rozróżniania wielkości liter). */
+                search?: string;
+            };
+            header: {
+                /** @description Identyfikator szkoły, w kontekście której wykonywane jest żądanie. Użytkownik musi mieć aktywne członkostwo w tej szkole. */
+                "X-School-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedCohortList"];
+                };
+            };
+            /** @description Nieprawidłowe dane (`code`: `validation_error`, szczegóły w `field_errors`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Brak zalogowanej sesji (`code`: `not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy token CSRF (`csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cohorts_retrieve: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Identyfikator szkoły, w kontekście której wykonywane jest żądanie. Użytkownik musi mieć aktywne członkostwo w tej szkole. */
+                "X-School-ID": string;
+            };
+            path: {
+                /** @description A UUID string identifying this Klasa. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cohort"];
+                };
+            };
+            /** @description Brak zalogowanej sesji (`code`: `not_authenticated`). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Brak uprawnień (`permission_denied`) albo brak/nieprawidłowy token CSRF (`csrf_failed`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Nie znaleziono zasobu (`code`: `not_found`). */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
