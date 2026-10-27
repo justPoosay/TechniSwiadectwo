@@ -1,8 +1,11 @@
 import uuid
+from datetime import timedelta
+from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from apps.students.validators import validate_pesel
 
@@ -277,3 +280,150 @@ class StudentDataCorrection(models.Model):
             author_name = "System / Nieznany"
 
         return f"Korekta {self.student} przez {author_name} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+class ImportBatchQuerySet(models.QuerySet["ImportBatch"]):
+    def for_school(self, school: Any) -> "ImportBatchQuerySet":
+        return self.filter(school=school)
+
+    def expired(self) -> "ImportBatchQuerySet":
+        return self.filter(
+            expires_at__lte=timezone.now(),
+            file_purged=False,
+        ).exclude(file="")
+
+
+class ImportBatch(models.Model):
+    DEFAULT_RETENTION_DAYS = 7
+
+    class SourceType(models.TextChoices):
+        CSV = "CSV", "Plik CSV"
+        JSON = "JSON", "Plik JSON"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Oczekuje na przetworzenie"
+        VALIDATING = "VALIDATING", "Weryfikacja w toku"
+        VALIDATED = "VALIDATED", "Zweryfikowany pomyślnie"
+        FAILED = "FAILED", "Błąd weryfikacji / przetwarzania"
+        APPLYING = "APPLYING", "Import w toku"
+        COMPLETED = "COMPLETED", "Zakończony pomyślnie"
+        REJECTED = "REJECTED", "Odrzucony"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey(
+        "core.School",
+        on_delete=models.CASCADE,
+        related_name="import_batches",
+        verbose_name="Szkoła",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="import_batches",
+        verbose_name="Autor importu",
+    )
+
+    source_type = models.CharField(
+        "Typ źródła",
+        max_length=10,
+        choices=SourceType.choices,
+    )
+    status = models.CharField(
+        "Status partii",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    file = models.FileField(
+        "Plik źródłowy",
+        upload_to="imports/%Y/%m/",
+        null=True,
+        blank=True,
+    )
+    original_filename = models.CharField("Oryginalna nazwa pliku", max_length=255)
+    file_size_bytes = models.PositiveIntegerField("Rozmiar pliku (bajty)", default=0)
+    checksum = models.CharField(
+        "Suma kontrolna (SHA-256)",
+        max_length=64,
+        help_text="Suma kontrolna SHA-256 pliku źródłowego",
+    )
+
+    # Liczniki rekordów i błędów
+    total_records = models.PositiveIntegerField("Łączna liczba rekordów", default=0)
+    valid_records = models.PositiveIntegerField("Liczba poprawnych rekordów", default=0)
+    invalid_records = models.PositiveIntegerField("Liczba błędnych rekordów", default=0)
+    imported_records = models.PositiveIntegerField(
+        "Liczba zaimportowanych rekordów", default=0
+    )
+
+    errors = models.JSONField(
+        "Lista błędów walidacji",
+        default=list,
+        blank=True,
+        help_text="Szczegóły błędów: wiersz, pole, kod, opis",
+    )
+    warnings = models.JSONField(
+        "Lista ostrzeżeń walidacji",
+        default=list,
+        blank=True,
+        help_text="Lista ostrzeżeń (np. nieznana klasa, brak drugiego imienia)",
+    )
+
+    # Czasy
+    created_at = models.DateTimeField("Data utworzenia", auto_now_add=True)
+    updated_at = models.DateTimeField("Data aktualizacji", auto_now=True)
+    completed_at = models.DateTimeField("Data zakończenia", null=True, blank=True)
+
+    # Retencja pliku źródłowego
+    expires_at = models.DateTimeField(
+        "Data wygaśnięcia pliku źródłowego",
+        help_text="Termin, po którym plik źródłowy zostanie automatycznie usunięty z dysku",
+    )
+    file_purged = models.BooleanField(
+        "Plik usunięty po retencji",
+        default=False,
+    )
+
+    objects = ImportBatchQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = "Partia importu"
+        verbose_name_plural = "Partie importu"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["school", "-created_at"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["expires_at", "file_purged"]),
+        ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(
+                days=self.DEFAULT_RETENTION_DAYS
+            )
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self) -> bool:
+        if not self.expires_at:
+            return False
+        return timezone.now() >= self.expires_at
+
+    def purge_file(self) -> bool:
+        """Trwale usuwa fizyczny plik źródłowy z magazynu po wygaśnięciu okresu retencji."""
+        if self.file and not self.file_purged:
+            storage = self.file.storage
+            name = self.file.name
+            if name and storage.exists(name):
+                storage.delete(name)
+            self.file = None
+            self.file_purged = True
+            self.save(update_fields=["file", "file_purged", "updated_at"])
+            return True
+        return False
+
+    def __str__(self) -> str:
+        return f"Partia {self.original_filename} ({self.get_source_type_display()}, {self.get_status_display()}) - {self.created_at:%Y-%m-%d %H:%M}"

@@ -1,0 +1,5 @@
+register_number,first_name,second_name,last_name,date_of_birth,place_of_birth,pesel,id_document_type,id_document_number,status,cohort_name,cohort_level,academic_year,admission_date,admission_document
+U/001/2025,Jan,Michał,Kowalski,2007-03-15,Warszawa,07231501234,,,ACTIVE,4A,4,2025/2026,2025-09-01,UCH/10/2025
+U/002/2025,Anna,,Nowak,2007-07-22,Kraków,07272209876,,,ACTIVE,4A,4,2025/2026,2025-09-01,UCH/10/2025
+U/003/2025,Dmytro,,Shevchenko,2006-11-05,Kijów,,PASSPORT,XX123456,ACTIVE,4A,4,2025/2026,2025-09-01,UCH/11/2025
+U/004/2025,Piotr,Paweł,Zieliński,2005-02-10,Warszawa,05221005555,,,GRADUATED,,,2024/2025,2021-09-01,UCH/01/2021

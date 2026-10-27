@@ -1,3 +1,4 @@
+import hashlib
 from datetime import date
 from typing import Any
 
@@ -5,7 +6,12 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.core.models import AcademicYear, Cohort
-from apps.students.models import Student, StudentDataCorrection, StudentHistoryEntry
+from apps.students.models import (
+    ImportBatch,
+    Student,
+    StudentDataCorrection,
+    StudentHistoryEntry,
+)
 
 
 class StudentEnrollmentService:
@@ -239,3 +245,22 @@ class StudentCorrectionService:
             )
 
         return student, correction_entry
+
+
+def calculate_file_checksum(file_content: bytes) -> str:
+    """Oblicza sumę kontrolną SHA-256 z zawartości pliku."""
+    return hashlib.sha256(file_content).hexdigest()
+
+
+class ImportBatchRetentionService:
+    @staticmethod
+    def purge_expired_batches() -> int:
+        """Trwale usuwa pliki źródłowe partii importu, które przekroczyły termin retencji.
+
+        Zwraca liczbę partii, dla których usunięto plik źródłowy.
+        """
+        purged_count = 0
+        for batch in ImportBatch.objects.expired():
+            if batch.purge_file():
+                purged_count += 1
+        return purged_count

@@ -276,4 +276,4 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 
 ## Zrobione
 
-### T29. Zdefiniować formaty CSV i JSON
+### T30. Dodać model partii importu

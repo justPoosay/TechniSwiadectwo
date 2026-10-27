@@ -49,6 +49,7 @@ generated-documents/
 uploads/
 *.pdf
 *.csv
+!docs/examples/*.csv
 *.xlsx
 *.xls
 *.ods

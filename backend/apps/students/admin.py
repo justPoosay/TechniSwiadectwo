@@ -4,6 +4,7 @@ from django import forms
 from django.contrib import admin
 
 from apps.students.models import (
+    ImportBatch,
     Student,
     StudentDataCorrection,
     StudentHistoryEntry,
@@ -182,3 +183,58 @@ class StudentHistoryEntryAdmin(admin.ModelAdmin):
     )
     ordering = ("-event_date", "-created_at")
     autocomplete_fields = ["student", "source_cohort", "target_cohort"]
+
+
+@admin.register(ImportBatch)
+class ImportBatchAdmin(admin.ModelAdmin):
+    list_display = (
+        "original_filename",
+        "school",
+        "author",
+        "source_type",
+        "status",
+        "total_records",
+        "valid_records",
+        "invalid_records",
+        "imported_records",
+        "created_at",
+        "expires_at",
+        "file_purged",
+    )
+    list_filter = (
+        "school",
+        "source_type",
+        "status",
+        "file_purged",
+        "created_at",
+    )
+    search_fields = (
+        "original_filename",
+        "checksum",
+        "author__email",
+        "author__first_name",
+        "author__last_name",
+    )
+    readonly_fields = (
+        "checksum",
+        "file_size_bytes",
+        "total_records",
+        "valid_records",
+        "invalid_records",
+        "imported_records",
+        "errors",
+        "warnings",
+        "created_at",
+        "updated_at",
+        "completed_at",
+        "file_purged",
+    )
+    actions = ["purge_expired_files_action"]
+
+    @admin.action(description="Usuń pliki źródłowe (retencja)")
+    def purge_expired_files_action(self, request: Any, queryset: Any) -> None:
+        count = 0
+        for batch in queryset:
+            if batch.purge_file():
+                count += 1
+        self.message_user(request, f"Usunięto pliki źródłowe z {count} partii importu.")
