@@ -123,6 +123,10 @@ SPECTACULAR_SETTINGS = {
     # Separate *Request components for write-only/read-only fields.
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/",
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "apps.core.schema.strip_database_integer_bounds",
+    ],
 }
 
 SESSION_COOKIE_AGE = 1209600

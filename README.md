@@ -235,6 +235,13 @@ Z katalogu głównego projektu można uruchomić pełen zestaw testów, lintowan
 
 ---
 
+### 3. Testy E2E oraz uprawnienia
+
+- Testy end-to-end (Playwright) logowania, ról, sesji i izolacji szkół: `npm run test:e2e` (wymaga działającej aplikacji i `python manage.py seed_e2e`). Szczegóły: [`docs/testing.md`](docs/testing.md).
+- Macierz uprawnień ról egzekwowana przez backend: [`docs/permissions.md`](docs/permissions.md).
+
+---
+
 ## Continuous Integration (CI / CD)
 
 Każda zmiana wysłana na gałęzie `main`, `master` lub `develop` (oraz w ramach Pull Requestów) automatycznie uruchamia potok CI w **GitHub Actions** (`.github/workflows/ci.yml`), który wykonuje:
@@ -277,3 +284,7 @@ Warunki wykorzystania projektu nie zostały jeszcze określone.
 ## Zrobione
 
 ### T30. Dodać model partii importu
+
+### T28. Dodać testy uwierzytelniania i izolacji
+
+Opis: [`docs/testing.md`](docs/testing.md) i [`docs/permissions.md`](docs/permissions.md).

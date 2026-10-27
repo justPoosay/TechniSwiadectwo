@@ -21,6 +21,11 @@ SCHOOL_HEADER = OpenApiParameter(
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
+# Django derives IntegerField min/max from the database backend: 64-bit on SQLite
+# (tests), 32-bit on PostgreSQL. Left in, they would make the schema depend on the
+# database it was generated with.
+DATABASE_INTEGER_BOUNDS = {-(2**31), 2**31 - 1, -(2**63), 2**63 - 1}
+
 ERROR_DESCRIPTIONS = {
     "400": "Nieprawidłowe dane (`code`: `validation_error`, szczegóły w `field_errors`).",
     "401": "Brak zalogowanej sesji (`code`: `not_authenticated`).",
@@ -90,8 +95,47 @@ class AutoSchema(SpectacularAutoSchema):
                 responses[code] = response
         return responses
 
+    def get_operation(self, *args: Any, **kwargs: Any) -> Any:
+        operation = super().get_operation(*args, **kwargs)
+        roles = getattr(self.view, "allowed_roles", None)
+        if operation and roles:
+            names = ", ".join(f"`{role}`" for role in roles)
+            note = f"**Wymagane role w szkole:** {names} (inne role: 403)."
+            description = operation.get("description")
+            operation["description"] = (
+                f"{description}\n\n{note}" if description else note
+            )
+        return operation
+
     def get_override_parameters(self) -> list[Any]:
         parameters = list(super().get_override_parameters())
         if isinstance(self.view, SchoolScopedViewSetMixin):
             parameters.append(SCHOOL_HEADER)
         return parameters
+
+
+def strip_database_integer_bounds(result: Any, **kwargs: Any) -> Any:
+    """Postprocessing hook: drop backend-specific integer limits from the schema.
+
+    Explicit limits (e.g. ``min_value=1`` on a serializer field) are kept.
+    """
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            if node.get("type") == "integer" and (
+                node.get("minimum") in DATABASE_INTEGER_BOUNDS
+                or node.get("maximum") in DATABASE_INTEGER_BOUNDS
+            ):
+                for key in ("minimum", "maximum"):
+                    if node.get(key) in DATABASE_INTEGER_BOUNDS:
+                        del node[key]
+                if node.get("format") == "int64":
+                    del node["format"]
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(result)
+    return result

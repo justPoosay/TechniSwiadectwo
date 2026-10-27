@@ -1,5 +1,7 @@
 from rest_framework import permissions
 
+ROLE_FORBIDDEN_DETAIL = "Twoja rola w tej szkole nie ma dostępu do tego zasobu."
+
 
 class IsSchoolMember(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:
@@ -19,3 +21,22 @@ class IsSchoolMember(permissions.BasePermission):
         if school_id and active_school:
             return bool(school_id == active_school.id)
         return False
+
+
+class HasSchoolRole(IsSchoolMember):
+    """IsSchoolMember + the role in the active school must be in ``view.allowed_roles``.
+
+    Views without ``allowed_roles`` are open to every member of the school.
+    The access matrix is documented in docs/permissions.md.
+    """
+
+    message = ROLE_FORBIDDEN_DETAIL
+
+    def has_permission(self, request, view) -> bool:
+        if not super().has_permission(request, view):
+            return False
+        allowed_roles = getattr(view, "allowed_roles", None)
+        if allowed_roles is None or request.user.is_superuser:
+            return True
+        membership = getattr(request, "school_membership", None)
+        return membership is not None and membership.role in allowed_roles

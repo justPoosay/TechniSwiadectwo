@@ -18,6 +18,7 @@
     "test:backend": "pytest backend",
     "test:frontend": "npm run test --prefix frontend",
     "test": "npm run test:backend && npm run test:frontend",
+    "test:e2e": "npm run test:e2e --prefix frontend",
     "build:frontend": "npm run build --prefix frontend",
     "build": "npm run build:frontend",
     "api:schema": "python backend/manage.py spectacular --settings=config.settings.test --file docs/api/openapi.yaml --validate --fail-on-warn",
