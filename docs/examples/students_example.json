@@ -1,0 +1,93 @@
+{
+  "$schema": "urn:techniswiadectwo:schemas:v1:students-import",
+  "version": "1.0",
+  "generated_at": "2026-10-27T08:30:00Z",
+  "source_system": "System Ewidencji Uczniów",
+  "academic_year": "2025/2026",
+  "students": [
+    {
+      "external_id": "EXT-1001",
+      "register_number": "U/001/2025",
+      "first_name": "Jan",
+      "second_name": "Michał",
+      "last_name": "Kowalski",
+      "date_of_birth": "2007-03-15",
+      "place_of_birth": "Warszawa",
+      "pesel": "07231501234",
+      "id_document": null,
+      "status": "ACTIVE",
+      "cohort": {
+        "name": "4A",
+        "level": 4
+      },
+      "admission": {
+        "event_date": "2025-09-01",
+        "document_number": "UCH/10/2025",
+        "notes": "Przyjęcie w postępowaniu rekrutacyjnym"
+      }
+    },
+    {
+      "external_id": "EXT-1002",
+      "register_number": "U/002/2025",
+      "first_name": "Anna",
+      "second_name": null,
+      "last_name": "Nowak",
+      "date_of_birth": "2007-07-22",
+      "place_of_birth": "Kraków",
+      "pesel": "07272209876",
+      "id_document": null,
+      "status": "ACTIVE",
+      "cohort": {
+        "name": "4A",
+        "level": 4
+      },
+      "admission": {
+        "event_date": "2025-09-01",
+        "document_number": "UCH/10/2025",
+        "notes": null
+      }
+    },
+    {
+      "external_id": "EXT-1003",
+      "register_number": "U/003/2025",
+      "first_name": "Dmytro",
+      "second_name": null,
+      "last_name": "Shevchenko",
+      "date_of_birth": "2006-11-05",
+      "place_of_birth": "Kijów",
+      "pesel": null,
+      "id_document": {
+        "type": "PASSPORT",
+        "number": "XX123456"
+      },
+      "status": "ACTIVE",
+      "cohort": {
+        "name": "4A",
+        "level": 4
+      },
+      "admission": {
+        "event_date": "2025-09-01",
+        "document_number": "UCH/11/2025",
+        "notes": "Uczeń obcokrajowiec"
+      }
+    },
+    {
+      "external_id": "EXT-1004",
+      "register_number": "U/004/2025",
+      "first_name": "Piotr",
+      "second_name": "Paweł",
+      "last_name": "Zieliński",
+      "date_of_birth": "2005-02-10",
+      "place_of_birth": "Warszawa",
+      "pesel": "05221005555",
+      "id_document": null,
+      "status": "GRADUATED",
+      "cohort": null,
+      "admission": {
+        "event_date": "2021-09-01",
+        "document_number": "UCH/01/2021",
+        "notes": null
+      }
+    }
+  ]
+}
